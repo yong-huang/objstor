@@ -2,13 +2,21 @@ use crate::error::Result;
 use crate::storage::pool::StoragePool;
 
 pub trait PlacementStrategy {
-    fn select_pools(&self, pools: &[StoragePool], replication_factor: usize) -> Result<Vec<StoragePool>>;
+    fn select_pools(
+        &self,
+        pools: &[StoragePool],
+        replication_factor: usize,
+    ) -> Result<Vec<StoragePool>>;
 }
 
 pub struct SimpleReplication;
 
 impl PlacementStrategy for SimpleReplication {
-    fn select_pools(&self, pools: &[StoragePool], replication_factor: usize) -> Result<Vec<StoragePool>> {
+    fn select_pools(
+        &self,
+        pools: &[StoragePool],
+        replication_factor: usize,
+    ) -> Result<Vec<StoragePool>> {
         if pools.len() < replication_factor {
             return Err(crate::error::Error::ConfigurationError(
                 "Not enough pools for replication".to_string(),

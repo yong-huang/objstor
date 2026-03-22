@@ -8,7 +8,7 @@ pub mod storage;
 pub use server::ServerConfig;
 pub use storage::{StorageConfig, StoragePoolConfig};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     pub server: ServerConfig,
     pub storage: StorageConfig,
@@ -16,14 +16,19 @@ pub struct Config {
 
 impl Config {
     /// Load configuration from a JSON file
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn from_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content = fs::read_to_string(path)?;
         let config: Config = serde_json::from_str(&content)?;
         Ok(config)
     }
 
     /// Save configuration to a JSON file
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn to_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let content = serde_json::to_string_pretty(self)?;
         fs::write(path, content)?;
         Ok(())
@@ -48,14 +53,5 @@ impl Config {
         let config_path = "data/config/objstor.json";
         fs::create_dir_all("data/config")?;
         self.to_file(config_path)
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            storage: StorageConfig::default(),
-        }
     }
 }

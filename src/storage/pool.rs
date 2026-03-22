@@ -240,7 +240,8 @@ impl StoragePool {
             status: format!("{:?}", self.status),
         };
 
-        let metadata_json = serde_json::to_string_pretty(&metadata).map_err(Error::SerializationError)?;
+        let metadata_json =
+            serde_json::to_string_pretty(&metadata).map_err(Error::SerializationError)?;
         tokio::fs::write(&metadata_path, metadata_json)
             .await
             .map_err(Error::IoError)?;

@@ -1,8 +1,8 @@
 pub mod auth;
-pub mod handler;
 pub mod bucket;
-pub mod object;
-pub mod multipart;
 pub mod error;
+pub mod handler;
+pub mod multipart;
+pub mod object;
 
 pub use handler::S3Handler;

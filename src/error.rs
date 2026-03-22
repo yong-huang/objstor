@@ -98,19 +98,27 @@ impl IntoResponse for Error {
             Error::StorageNotFound(_) | Error::ObjectNotFound(_) | Error::BucketNotFound(_) => {
                 (StatusCode::NOT_FOUND, "NoSuchKey", self.to_string())
             }
-            Error::BucketAlreadyExists(_) => {
-                (StatusCode::CONFLICT, "BucketAlreadyExists", self.to_string())
-            }
-            Error::BucketNotEmpty(_) => {
-                (StatusCode::CONFLICT, "BucketNotEmpty", self.to_string())
-            }
-            Error::StorageFull(_) | Error::NoAvailablePool => (StatusCode::SERVICE_UNAVAILABLE, "StorageFull", self.to_string()),
-            Error::AuthenticationFailed(_) => {
-                (StatusCode::UNAUTHORIZED, "InvalidAccessKeyId", self.to_string())
-            }
-            Error::SignatureMismatch | Error::InvalidAccessKey => {
-                (StatusCode::FORBIDDEN, "SignatureDoesNotMatch", self.to_string())
-            }
+            Error::BucketAlreadyExists(_) => (
+                StatusCode::CONFLICT,
+                "BucketAlreadyExists",
+                self.to_string(),
+            ),
+            Error::BucketNotEmpty(_) => (StatusCode::CONFLICT, "BucketNotEmpty", self.to_string()),
+            Error::StorageFull(_) | Error::NoAvailablePool => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "StorageFull",
+                self.to_string(),
+            ),
+            Error::AuthenticationFailed(_) => (
+                StatusCode::UNAUTHORIZED,
+                "InvalidAccessKeyId",
+                self.to_string(),
+            ),
+            Error::SignatureMismatch | Error::InvalidAccessKey => (
+                StatusCode::FORBIDDEN,
+                "SignatureDoesNotMatch",
+                self.to_string(),
+            ),
             Error::AccessDenied => (StatusCode::FORBIDDEN, "AccessDenied", self.to_string()),
             Error::InvalidRequest(_) | Error::InvalidHeaderValue(_) | Error::MissingHeader(_) => {
                 (StatusCode::BAD_REQUEST, "InvalidRequest", self.to_string())
@@ -118,15 +126,13 @@ impl IntoResponse for Error {
             Error::ContentLengthMismatch => {
                 (StatusCode::BAD_REQUEST, "IncompleteBody", self.to_string())
             }
-            Error::InvalidPartOrder => {
-                (StatusCode::BAD_REQUEST, "InvalidPartOrder", self.to_string())
-            }
-            Error::InvalidPartSize => {
-                (StatusCode::BAD_REQUEST, "InvalidPart", self.to_string())
-            }
-            Error::UploadNotFound(_) => {
-                (StatusCode::NOT_FOUND, "NoSuchUpload", self.to_string())
-            }
+            Error::InvalidPartOrder => (
+                StatusCode::BAD_REQUEST,
+                "InvalidPartOrder",
+                self.to_string(),
+            ),
+            Error::InvalidPartSize => (StatusCode::BAD_REQUEST, "InvalidPart", self.to_string()),
+            Error::UploadNotFound(_) => (StatusCode::NOT_FOUND, "NoSuchUpload", self.to_string()),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "InternalError",

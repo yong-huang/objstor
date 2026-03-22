@@ -23,7 +23,12 @@ pub async fn handle_create_multipart_upload(
 ) -> Result<Response> {
     state.metadata.get_bucket(&bucket)?;
 
-    let upload = state.multipart_manager.lock().await.create_upload(bucket, key, "owner".to_string())?;
+    let upload =
+        state
+            .multipart_manager
+            .lock()
+            .await
+            .create_upload(bucket, key, "owner".to_string())?;
 
     let result = InitiateMultipartUploadResult {
         bucket: upload.bucket.clone(),
@@ -31,7 +36,8 @@ pub async fn handle_create_multipart_upload(
         upload_id: upload.upload_id.clone(),
     };
 
-    let xml = serde_xml_rs::to_string(&result).map_err(|e| crate::error::Error::InternalError(e.to_string()))?;
+    let xml = serde_xml_rs::to_string(&result)
+        .map_err(|e| crate::error::Error::InternalError(e.to_string()))?;
 
     Ok((
         StatusCode::OK,

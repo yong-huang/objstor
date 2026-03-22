@@ -22,7 +22,8 @@ impl MetadataStore {
         let conn = Connection::open(db_path).map_err(Error::DatabaseError)?;
 
         // Enable WAL mode for better concurrency (use query to handle returned results)
-        conn.query_row("PRAGMA journal_mode=WAL", [], |_row| Ok(())).map_err(Error::DatabaseError)?;
+        conn.query_row("PRAGMA journal_mode=WAL", [], |_row| Ok(()))
+            .map_err(Error::DatabaseError)?;
 
         // Create tables
         Self::init_schema(&conn)?;
@@ -50,10 +51,7 @@ impl MetadataStore {
         .map_err(Error::DatabaseError)?;
 
         // Add preferred_pool column if table exists without it (for backward compatibility)
-        let _ = conn.execute(
-            "ALTER TABLE buckets ADD COLUMN preferred_pool TEXT",
-            [],
-        );
+        let _ = conn.execute("ALTER TABLE buckets ADD COLUMN preferred_pool TEXT", []);
 
         // Objects table
         conn.execute(
@@ -123,14 +121,26 @@ impl MetadataStore {
         .map_err(Error::DatabaseError)?;
 
         // Create indexes
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_bucket ON objects(bucket)", [])
-            .map_err(Error::DatabaseError)?;
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_key ON objects(bucket, key)", [])
-            .map_err(Error::DatabaseError)?;
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_hash ON objects(object_hash)", [])
-            .map_err(Error::DatabaseError)?;
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_parts_upload_id ON upload_parts(upload_id)", [])
-            .map_err(Error::DatabaseError)?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_objects_bucket ON objects(bucket)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_objects_key ON objects(bucket, key)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_objects_hash ON objects(object_hash)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_parts_upload_id ON upload_parts(upload_id)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
 
         Ok(())
     }

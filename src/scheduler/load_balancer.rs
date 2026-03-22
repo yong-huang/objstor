@@ -47,7 +47,11 @@ impl LoadBalancer {
     }
 
     /// Least loaded strategy: select healthy pool with lowest usage ratio
-    fn least_loaded_strategy<'a>(&self, pools: &'a [StoragePool], size: u64) -> Result<&'a StoragePool> {
+    fn least_loaded_strategy<'a>(
+        &self,
+        pools: &'a [StoragePool],
+        size: u64,
+    ) -> Result<&'a StoragePool> {
         pools
             .iter()
             .filter(|p| p.status == PoolStatus::Healthy)
@@ -60,7 +64,11 @@ impl LoadBalancer {
     }
 
     /// Weighted round robin: weight by available space
-    fn weighted_round_robin_strategy<'a>(&self, pools: &'a [StoragePool], size: u64) -> Result<&'a StoragePool> {
+    fn weighted_round_robin_strategy<'a>(
+        &self,
+        pools: &'a [StoragePool],
+        size: u64,
+    ) -> Result<&'a StoragePool> {
         let available_pools: Vec<_> = pools
             .iter()
             .filter(|p| p.status == PoolStatus::Healthy)
@@ -76,8 +84,9 @@ impl LoadBalancer {
 
         // Simple weighted selection based on available space
         let mut cumulative = 0u64;
-        let target = (self.round_robin_index.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-            as u64)
+        let target = (self
+            .round_robin_index
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u64)
             % total_available;
 
         for pool in &available_pools {
@@ -92,7 +101,11 @@ impl LoadBalancer {
     }
 
     /// Adaptive strategy: consider multiple factors
-    fn adaptive_strategy<'a>(&self, pools: &'a [StoragePool], size: u64) -> Result<&'a StoragePool> {
+    fn adaptive_strategy<'a>(
+        &self,
+        pools: &'a [StoragePool],
+        size: u64,
+    ) -> Result<&'a StoragePool> {
         // Score each pool based on multiple factors:
         // 1. Available space (40%)
         // 2. Object count (20%)
@@ -129,7 +142,11 @@ impl LoadBalancer {
     }
 
     /// Consistent hash strategy: use hash of object to select pool
-    fn consistent_hash_strategy<'a>(&self, pools: &'a [StoragePool], _size: u64) -> Result<&'a StoragePool> {
+    fn consistent_hash_strategy<'a>(
+        &self,
+        pools: &'a [StoragePool],
+        _size: u64,
+    ) -> Result<&'a StoragePool> {
         let available_pools: Vec<_> = pools
             .iter()
             .filter(|p| p.status == PoolStatus::Healthy)

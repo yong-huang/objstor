@@ -83,14 +83,19 @@ impl Default for StorageConfig {
 
 impl StorageConfig {
     /// Load storage configuration from a file
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn from_file<P: AsRef<Path>>(
+        path: P,
+    ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let content = fs::read_to_string(path)?;
         let config: StorageConfig = serde_json::from_str(&content)?;
         Ok(config)
     }
 
     /// Save storage configuration to a file
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn to_file<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let content = serde_json::to_string_pretty(self)?;
         fs::write(path, content)?;
         Ok(())
@@ -98,15 +103,16 @@ impl StorageConfig {
 
     /// Convert StoragePoolConfig to PoolConfig
     pub fn to_pool_configs(&self) -> Vec<PoolConfig> {
-        self.pools.iter().map(|pool_config| {
-            PoolConfig {
+        self.pools
+            .iter()
+            .map(|pool_config| PoolConfig {
                 id: pool_config.id.clone(),
                 path: pool_config.path.clone(),
                 capacity: pool_config.capacity,
                 max_objects: pool_config.max_objects,
                 quota_enabled: pool_config.quota_enabled,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Initialize storage directory structure

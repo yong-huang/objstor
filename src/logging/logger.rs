@@ -4,15 +4,14 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 pub fn init_logging(config: &ServerConfig) -> Result<WorkerGuard> {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&config.log_level));
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level));
 
     // Create logs directory
     std::fs::create_dir_all(&config.log_dir)?;
 
     // File appender with daily rotation
-    let file_appender =
-        tracing_appender::rolling::daily(&config.log_dir, "objstor.log");
+    let file_appender = tracing_appender::rolling::daily(&config.log_dir, "objstor.log");
     let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
 
     // Console layer

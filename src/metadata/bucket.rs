@@ -1,8 +1,8 @@
 use crate::error::{Error, Result};
 use crate::metadata::db::MetadataStore;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bucket {

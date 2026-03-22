@@ -37,22 +37,28 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
             interval.tick().await;
 
             // Send metrics update
-            let pools: Vec<crate::storage::pool::StoragePool> = state.pool_manager.get_all_pools().await;
+            let pools: Vec<crate::storage::pool::StoragePool> =
+                state.pool_manager.get_all_pools().await;
             let (used, capacity) = state.pool_manager.get_total_usage().await;
 
             // Get buckets list
             let buckets = state.metadata.list_buckets().unwrap_or_default();
-            let buckets_data: Vec<serde_json::Value> = buckets.iter().map(|b| {
-                serde_json::json!({
-                    "name": b.name,
-                    "created_at": b.created_at.to_rfc3339(),
-                    "region": b.region,
-                    "owner": b.owner,
+            let buckets_data: Vec<serde_json::Value> = buckets
+                .iter()
+                .map(|b| {
+                    serde_json::json!({
+                        "name": b.name,
+                        "created_at": b.created_at.to_rfc3339(),
+                        "region": b.region,
+                        "owner": b.owner,
+                    })
                 })
-            }).collect();
+                .collect();
 
             // Count total objects from database
-            let total_objects = state.metadata.conn()
+            let total_objects = state
+                .metadata
+                .conn()
                 .lock()
                 .unwrap()
                 .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))
@@ -125,8 +131,14 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 0 => ("info", "System health check completed".to_string()),
                 1 => ("info", format!("Processing request #{}", counter)),
                 2 => ("info", format!("Storage usage: {}%", counter % 100)),
-                3 => ("warn", format!("High memory usage: {}%", 80 + (counter % 20))),
-                4 => ("info", format!("Active connections: {}", 10 + (counter % 50))),
+                3 => (
+                    "warn",
+                    format!("High memory usage: {}%", 80 + (counter % 20)),
+                ),
+                4 => (
+                    "info",
+                    format!("Active connections: {}", 10 + (counter % 50)),
+                ),
                 5 => ("info", "Bucket access: test-bucket".to_string()),
                 6 => ("info", format!("Object uploaded: file-{}.txt", counter)),
                 7 => ("info", "GET /api/v1/metrics - 200 OK".to_string()),
@@ -153,11 +165,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
     // Task to send messages to client
     let send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
-            if sender
-                .send(Message::Text(msg.to_string()))
-                .await
-                .is_err()
-            {
+            if sender.send(Message::Text(msg.to_string())).await.is_err() {
                 break;
             }
         }

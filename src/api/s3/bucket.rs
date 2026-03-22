@@ -17,7 +17,10 @@ pub async fn handle_list_buckets(State(state): State<S3AppState>) -> Result<Resp
     for bucket in buckets {
         xml.push_str("<Bucket>");
         xml.push_str(&format!("<Name>{}</Name>", escape_xml(&bucket.name)));
-        xml.push_str(&format!("<CreationDate>{}</CreationDate>", bucket.created_at.to_rfc3339()));
+        xml.push_str(&format!(
+            "<CreationDate>{}</CreationDate>",
+            bucket.created_at.to_rfc3339()
+        ));
         xml.push_str("</Bucket>");
     }
 
@@ -47,7 +50,9 @@ pub async fn handle_create_bucket(
 ) -> Result<Response> {
     // Validate bucket name
     if !is_valid_bucket_name(&bucket_name) {
-        return Err(crate::error::Error::InvalidRequest("Invalid bucket name".to_string()));
+        return Err(crate::error::Error::InvalidRequest(
+            "Invalid bucket name".to_string(),
+        ));
     }
 
     // Check if bucket exists
@@ -71,7 +76,10 @@ pub async fn handle_create_bucket(
     if let Some(ref pool_id) = preferred_pool {
         let pools = state.pool_manager.get_all_pools().await;
         if !pools.iter().any(|p| &p.id == pool_id) {
-            return Err(crate::error::Error::InvalidRequest(format!("Pool '{}' not found", pool_id)));
+            return Err(crate::error::Error::InvalidRequest(format!(
+                "Pool '{}' not found",
+                pool_id
+            )));
         }
     }
 

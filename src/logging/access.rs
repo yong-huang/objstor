@@ -19,11 +19,7 @@ pub struct AccessLog {
 }
 
 impl AccessLog {
-    pub fn new(
-        operation: String,
-        http_method: String,
-        request_id: String,
-    ) -> Self {
+    pub fn new(operation: String, http_method: String, request_id: String) -> Self {
         Self {
             timestamp: Utc::now(),
             bucket: None,

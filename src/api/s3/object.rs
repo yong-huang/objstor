@@ -24,7 +24,10 @@ pub async fn handle_put_object(
     let etag = format!("{:x}", md5::Md5::digest(&body));
 
     // Store object using bucket's preferred pool or load balancer
-    let mut pool = state.pool_manager.select_pool_for_bucket(preferred_pool, body.len() as u64).await?;
+    let mut pool = state
+        .pool_manager
+        .select_pool_for_bucket(preferred_pool, body.len() as u64)
+        .await?;
     let location = pool.write_object(&body).await?;
 
     // Create metadata
@@ -54,7 +57,12 @@ pub async fn handle_put_object(
         StatusCode::OK,
         [
             (axum::http::header::ETAG, etag),
-            ("x-amz-version-id".parse::<axum::http::HeaderName>().unwrap(), "null".to_string()),
+            (
+                "x-amz-version-id"
+                    .parse::<axum::http::HeaderName>()
+                    .unwrap(),
+                "null".to_string(),
+            ),
         ],
         "",
     )
@@ -75,10 +83,18 @@ pub async fn handle_get_object(
     Ok((
         StatusCode::OK,
         [
-            (axum::http::header::CONTENT_TYPE, object.content_type.unwrap_or_else(|| "application/octet-stream".to_string())),
+            (
+                axum::http::header::CONTENT_TYPE,
+                object
+                    .content_type
+                    .unwrap_or_else(|| "application/octet-stream".to_string()),
+            ),
             (axum::http::header::CONTENT_LENGTH, object.size.to_string()),
             (axum::http::header::ETAG, object.etag.clone()),
-            ("last-modified".parse::<axum::http::HeaderName>().unwrap(), format!("{}", object.modified_at.format("%a, %d %b %Y %H:%M:%S GMT"))),
+            (
+                "last-modified".parse::<axum::http::HeaderName>().unwrap(),
+                format!("{}", object.modified_at.format("%a, %d %b %Y %H:%M:%S GMT")),
+            ),
         ],
         data,
     )
@@ -94,10 +110,18 @@ pub async fn handle_head_object(
     Ok((
         StatusCode::OK,
         [
-            (axum::http::header::CONTENT_TYPE, object.content_type.unwrap_or_else(|| "application/octet-stream".to_string())),
+            (
+                axum::http::header::CONTENT_TYPE,
+                object
+                    .content_type
+                    .unwrap_or_else(|| "application/octet-stream".to_string()),
+            ),
             (axum::http::header::CONTENT_LENGTH, object.size.to_string()),
             (axum::http::header::ETAG, object.etag),
-            ("last-modified".parse::<axum::http::HeaderName>().unwrap(), format!("{}", object.modified_at.format("%a, %d %b %Y %H:%M:%S GMT"))),
+            (
+                "last-modified".parse::<axum::http::HeaderName>().unwrap(),
+                format!("{}", object.modified_at.format("%a, %d %b %Y %H:%M:%S GMT")),
+            ),
         ],
         (),
     )

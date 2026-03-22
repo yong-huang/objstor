@@ -34,7 +34,8 @@ impl RequestMetrics {
 
     pub fn record_bytes(&self, sent: u64, received: u64) {
         self.total_bytes_sent.fetch_add(sent, Ordering::Relaxed);
-        self.total_bytes_received.fetch_add(received, Ordering::Relaxed);
+        self.total_bytes_received
+            .fetch_add(received, Ordering::Relaxed);
     }
 
     pub fn get_stats(&self) -> RequestStats {

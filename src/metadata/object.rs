@@ -1,9 +1,9 @@
 use crate::error::{Error, Result};
 use crate::metadata::db::MetadataStore;
 use chrono::{DateTime, Utc};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use rusqlite::params;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Object {
@@ -38,7 +38,11 @@ impl MetadataStore {
 
         let now = Utc::now().timestamp();
         let tags_json = obj.tags.as_ref().map(serde_json::to_string).transpose()?;
-        let metadata_json = obj.metadata.as_ref().map(serde_json::to_string).transpose()?;
+        let metadata_json = obj
+            .metadata
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()?;
 
         conn.execute(
             "INSERT INTO objects (bucket, key, version_id, object_hash, size, content_type, etag, created_at, modified_at, pool_id, storage_class, tags_json, metadata_json)

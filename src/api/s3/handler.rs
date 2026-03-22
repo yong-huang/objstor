@@ -35,13 +35,17 @@ impl S3Handler {
     ) -> Response {
         // Parse URI to extract bucket and key
         let path = uri.path();
-        let parts: Vec<&str> = path.trim_start_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+        let parts: Vec<&str> = path
+            .trim_start_matches('/')
+            .split('/')
+            .filter(|s| !s.is_empty())
+            .collect();
 
         match (method.as_str(), parts.len(), parts.first()) {
             // List all buckets (empty path)
-            ("GET", 0, _) => {
-                bucket::handle_list_buckets(State(state)).await.unwrap_or_else(|e| e.into_response())
-            }
+            ("GET", 0, _) => bucket::handle_list_buckets(State(state))
+                .await
+                .unwrap_or_else(|e| e.into_response()),
 
             // Bucket operations
             ("PUT", 1, Some(bucket)) => {
@@ -69,9 +73,14 @@ impl S3Handler {
             // Object operations (2+ parts: bucket + key)
             ("PUT", 2.., Some(bucket)) => {
                 let key = parts[1..].join("/");
-                object::handle_put_object(State(state), Path((bucket.to_string(), key)), headers, body)
-                    .await
-                    .unwrap_or_else(|e| e.into_response())
+                object::handle_put_object(
+                    State(state),
+                    Path((bucket.to_string(), key)),
+                    headers,
+                    body,
+                )
+                .await
+                .unwrap_or_else(|e| e.into_response())
             }
             ("GET", 2.., Some(bucket)) => {
                 let key = parts[1..].join("/");

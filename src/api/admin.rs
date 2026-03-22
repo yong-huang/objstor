@@ -1,8 +1,8 @@
+use crate::api::s3::handler::S3AppState;
 use axum::{
     extract::State,
     response::{IntoResponse, Json},
 };
-use crate::api::s3::handler::S3AppState;
 
 pub async fn get_health() -> impl IntoResponse {
     Json(serde_json::json!({
@@ -31,7 +31,9 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
         .collect();
 
     // Count total objects from database
-    let total_objects = state.metadata.conn()
+    let total_objects = state
+        .metadata
+        .conn()
         .lock()
         .unwrap()
         .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))

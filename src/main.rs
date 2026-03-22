@@ -5,7 +5,7 @@ use axum::{
     Router,
 };
 use objstor::{
-    api::{admin, s3::handler::S3AppState, middleware::logging_middleware},
+    api::{admin, middleware::logging_middleware, s3::handler::S3AppState},
     config::Config,
     logging::init_logging,
     scheduler::SchedulingStrategy,
@@ -20,8 +20,8 @@ use tower_http::services::ServeDir;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load or create configuration
-    let config = Config::load_or_create()
-        .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+    let config =
+        Config::load_or_create().map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
 
     // Initialize logging with config from file
     let _guard = init_logging(&config.server)?;
@@ -29,7 +29,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Loaded configuration from data/config/objstor.json");
 
     // Initialize storage directories
-    config.storage.init_directories()
+    config
+        .storage
+        .init_directories()
         .map_err(|e| anyhow::anyhow!("Failed to initialize directories: {}", e))?;
     tracing::info!("Storage directories initialized");
 
@@ -51,9 +53,8 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    let pool_manager = Arc::new(
-        PoolManager::new(pool_configs, SchedulingStrategy::LeastLoaded).await?,
-    );
+    let pool_manager =
+        Arc::new(PoolManager::new(pool_configs, SchedulingStrategy::LeastLoaded).await?);
 
     // Initialize metadata store
     let metadata_path = data_dir.join("metadata.db");
@@ -80,7 +81,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", axum::routing::get(admin::get_health))
         .route("/api/v1/health", axum::routing::get(admin::get_health))
         .route("/api/v1/metrics", axum::routing::get(admin::get_metrics))
-        .route("/api/v1/buckets", axum::routing::get(admin::get_buckets_api))
+        .route(
+            "/api/v1/buckets",
+            axum::routing::get(admin::get_buckets_api),
+        )
         // WebSocket endpoint
         .route("/ws", axum::routing::get(websocket::websocket_handler))
         // Web UI routes (at /web)
@@ -90,7 +94,12 @@ async fn main() -> anyhow::Result<()> {
         // S3 API fallback (handles all other paths including "/" for ListBuckets)
         .fallback(s3_handler_wrap)
         // CORS
-        .layer(CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         // Middleware
         .layer(axum::middleware::from_fn(logging_middleware))
         .with_state(state.clone());
@@ -107,24 +116,25 @@ async fn main() -> anyhow::Result<()> {
     // Create TCP listener and start server
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
     Ok(())
 }
 
-async fn s3_handler_wrap(
-    State(state): State<S3AppState>,
-    req: Request,
-) -> Response {
+async fn s3_handler_wrap(State(state): State<S3AppState>, req: Request) -> Response {
     tracing::info!("S3 Request: {} {}", req.method(), req.uri());
 
     let (parts, body) = req.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 16 * 1024 * 1024).await {
         Ok(bytes) => bytes,
-        Err(_) => return Response::builder()
-            .status(StatusCode::PAYLOAD_TOO_LARGE)
-            .body(axum::body::Body::from("Request too large"))
-            .unwrap(),
+        Err(_) => {
+            return Response::builder()
+                .status(StatusCode::PAYLOAD_TOO_LARGE)
+                .body(axum::body::Body::from("Request too large"))
+                .unwrap()
+        }
     };
 
     objstor::api::s3::handler::S3Handler::handle_request(

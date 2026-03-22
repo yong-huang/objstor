@@ -1,10 +1,10 @@
-pub mod db;
 pub mod bucket;
+pub mod db;
 pub mod object;
-pub mod user;
 pub mod policy;
+pub mod user;
 
-pub use db::MetadataStore;
 pub use bucket::{Bucket, BucketMetadata};
+pub use db::MetadataStore;
 pub use object::{Object, ObjectMetadata};
 pub use user::{AccessKey, User};

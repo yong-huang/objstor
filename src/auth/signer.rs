@@ -93,11 +93,8 @@ impl Signer {
             signed_headers,
             body,
         };
-        let expected_signature = self.calculate_signature(
-            &request_ctx,
-            secret_key,
-            &signing_params,
-        )?;
+        let expected_signature =
+            self.calculate_signature(&request_ctx, secret_key, &signing_params)?;
 
         if expected_signature != signature {
             return Err(Error::SignatureMismatch);
@@ -115,7 +112,8 @@ impl Signer {
         // 1. Create canonical request
         let canonical_uri = request_ctx.uri;
         let canonical_querystring = "";
-        let canonical_headers = self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
+        let canonical_headers =
+            self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
         let signed_headers_list = request_ctx.signed_headers;
 
         // Hash payload
@@ -123,16 +121,26 @@ impl Signer {
 
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\n{}",
-            request_ctx.method, canonical_uri, canonical_querystring, canonical_headers, signed_headers_list, payload_hash
+            request_ctx.method,
+            canonical_uri,
+            canonical_querystring,
+            canonical_headers,
+            signed_headers_list,
+            payload_hash
         );
 
         // 2. Create string to sign
         let algorithm = "AWS4-HMAC-SHA256";
-        let datetime = request_ctx.headers
+        let datetime = request_ctx
+            .headers
             .get("x-amz-date")
             .ok_or_else(|| Error::MissingHeader("x-amz-date".to_string()))?;
-        let credential_scope = format!("{}/{}/{}/aws4_request", signing_params.date, signing_params.region, "s3");
-        let hashed_canonical_request = hex::encode(sha2::Sha256::digest(canonical_request.as_bytes()));
+        let credential_scope = format!(
+            "{}/{}/{}/aws4_request",
+            signing_params.date, signing_params.region, "s3"
+        );
+        let hashed_canonical_request =
+            hex::encode(sha2::Sha256::digest(canonical_request.as_bytes()));
 
         let string_to_sign = format!(
             "{}\n{}\n{}\n{}",
@@ -140,7 +148,10 @@ impl Signer {
         );
 
         // 3. Calculate signature
-        let k_date = Self::hmac_sha256(format!("AWS4{}", secret_key).as_bytes(), signing_params.date.as_bytes())?;
+        let k_date = Self::hmac_sha256(
+            format!("AWS4{}", secret_key).as_bytes(),
+            signing_params.date.as_bytes(),
+        )?;
         let k_region = Self::hmac_sha256(&k_date, signing_params.region.as_bytes())?;
         let k_service = Self::hmac_sha256(&k_region, "s3".as_bytes())?;
         let k_signing = Self::hmac_sha256(&k_service, b"aws4_request")?;

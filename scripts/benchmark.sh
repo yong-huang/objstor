@@ -3,7 +3,7 @@
 
 set -e
 
-ENDPOINT="http://localhost:9000"
+ENDPOINT="http://localhost:8080"
 BUCKET="benchmark-bucket"
 FILE_SIZES=("1K" "1M" "10M")
 FILE_COUNT=100

@@ -1,11 +1,5 @@
 use crate::api::s3::handler::S3AppState;
-use axum::{
-    body::Body,
-    extract::State,
-    response::Response,
-    routing::get,
-    Router,
-};
+use axum::{body::Body, extract::State, response::Response, routing::get, Router};
 use http::{header, StatusCode};
 
 pub fn web_routes() -> Router<S3AppState> {

@@ -22,10 +22,22 @@ impl IntoResponse for S3Error {
             S3Error::NoSuchKey(k) => (StatusCode::NOT_FOUND, "NoSuchKey", k),
             S3Error::BucketAlreadyExists(b) => (StatusCode::CONFLICT, "BucketAlreadyExists", b),
             S3Error::InvalidBucketName(b) => (StatusCode::BAD_REQUEST, "InvalidBucketName", b),
-            S3Error::AccessDenied => (StatusCode::FORBIDDEN, "AccessDenied", "Access Denied".to_string()),
-            S3Error::SignatureDoesNotMatch => (StatusCode::FORBIDDEN, "SignatureDoesNotMatch", "Signature mismatch".to_string()),
+            S3Error::AccessDenied => (
+                StatusCode::FORBIDDEN,
+                "AccessDenied",
+                "Access Denied".to_string(),
+            ),
+            S3Error::SignatureDoesNotMatch => (
+                StatusCode::FORBIDDEN,
+                "SignatureDoesNotMatch",
+                "Signature mismatch".to_string(),
+            ),
             S3Error::InvalidArgument(m) => (StatusCode::BAD_REQUEST, "InvalidArgument", m),
-            S3Error::InternalError => (StatusCode::INTERNAL_SERVER_ERROR, "InternalError", "Internal error".to_string()),
+            S3Error::InternalError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "InternalError",
+                "Internal error".to_string(),
+            ),
         };
 
         let error_body = S3ErrorResponse {

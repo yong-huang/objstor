@@ -1,8 +1,4 @@
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, middleware::Next, response::Response};
 
 pub async fn logging_middleware(req: Request, next: Next) -> Response {
     let method = req.method().clone();
