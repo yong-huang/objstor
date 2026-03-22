@@ -1,0 +1,76 @@
+[package]
+name = "objstor"
+version = "0.1.0"
+edition = "2021"
+description = "S3-compatible object storage simulator"
+authors = ["ObjStor Team"]
+
+[dependencies]
+# Web framework
+# axum = "0.7"  # Moved below with ws feature
+tokio = { version = "1.35", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit", "fs"] }
+hyper = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+rusqlite = { version = "0.30", features = ["bundled"] }
+
+# AWS S3 signature (optional - using custom implementation)
+hex = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Crypto
+sha2 = "0.10"
+md-5 = "0.10"
+hmac = "0.12"
+
+# XML
+serde-xml-rs = "0.6"
+
+# Utils
+anyhow = "1.0"
+thiserror = "1.0"
+bytes = "1.5"
+
+# WebSocket
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
+
+# Axum WebSocket feature
+axum = { version = "0.7", features = ["ws"] }
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# HTTP types
+http = "1.0"
+http-body = "1.0"
+http-body-util = "0.1"
+
+# Async utilities
+async-trait = "0.1"
+
+[dev-dependencies]
+criterion = "0.5"
+tokio-test = "0.4"
+
+[[bin]]
+name = "objstor"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
