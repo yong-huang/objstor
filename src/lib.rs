@@ -13,4 +13,4 @@ pub mod api;
 pub mod web;
 
 pub use error::{Error, Result};
-pub use config::{Config, ServerConfig, StorageConfig};
+pub use config::{Config, ServerConfig, StorageConfig, StoragePoolConfig};

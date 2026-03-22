@@ -1,0 +1,32 @@
+{
+  "storage": {
+    "data_dir": "./data",
+    "pools": [
+      {
+        "id": "hot-ssd",
+        "path": "/fast/ssd/objstor",
+        "capacity": 536870912000,
+        "max_objects": 5000000,
+        "quota_enabled": false
+      },
+      {
+        "id": "cold-hdd",
+        "path": "/slow/hdd/objstor",
+        "capacity": 2199023255552,
+        "max_objects": 50000000,
+        "quota_enabled": true
+      },
+      {
+        "id": "backup-nfs",
+        "path": "/mnt/nfs/objstor-backup",
+        "capacity": 10995116277760,
+        "max_objects": 100000000,
+        "quota_enabled": true
+      }
+    ],
+    "scheduler": {
+      "strategy": "least_loaded",
+      "rebalance_threshold": 0.2
+    }
+  }
+}

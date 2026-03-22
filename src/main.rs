@@ -6,49 +6,50 @@ use axum::{
 };
 use objstor::{
     api::{admin, s3::handler::S3AppState, middleware::logging_middleware},
+    config::Config,
     logging::init_logging,
     scheduler::SchedulingStrategy,
-    storage::{pool::PoolConfig, PoolManager},
+    storage::PoolManager,
     web::websocket,
 };
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Initialize logging
-    let log_config = objstor::config::ServerConfig::default();
-    let _guard = init_logging(&log_config)?;
+    // Load or create configuration
+    let config = Config::load_or_create()
+        .map_err(|e| anyhow::anyhow!("Failed to load config: {}", e))?;
+
+    // Initialize logging with config from file
+    let _guard = init_logging(&config.server)?;
     tracing::info!("Starting ObjStor v0.1.0");
+    tracing::info!("Loaded configuration from data/config/objstor.json");
 
-    // Initialize storage layout
-    let data_dir = PathBuf::from("./data");
-    let config_path = data_dir.join("config");
+    // Initialize storage directories
+    config.storage.init_directories()
+        .map_err(|e| anyhow::anyhow!("Failed to initialize directories: {}", e))?;
+    tracing::info!("Storage directories initialized");
 
-    // Create storage directory structure
-    std::fs::create_dir_all(&data_dir)?;
-    std::fs::create_dir_all(&config_path)?;
-    std::fs::create_dir_all(data_dir.join("pools"))?;
+    // Get data directory from config
+    let data_dir = &config.storage.data_dir;
 
-    // Initialize storage pools
-    let pool_configs = vec![
-        PoolConfig {
-            id: "pool-001".to_string(),
-            path: data_dir.join("pools/pool-001"),
-            capacity: 100 * 1024 * 1024 * 1024, // 100GB
-            max_objects: 1_000_000,
-            quota_enabled: false,
-        },
-        PoolConfig {
-            id: "pool-002".to_string(),
-            path: data_dir.join("pools/pool-002"),
-            capacity: 100 * 1024 * 1024 * 1024, // 100GB
-            max_objects: 1_000_000,
-            quota_enabled: false,
-        },
-    ];
+    // Convert storage pool configs to pool configs
+    let pool_configs = config.storage.to_pool_configs();
+    tracing::info!("Loaded {} storage pools", pool_configs.len());
+
+    // Log pool information
+    for pool in &pool_configs {
+        tracing::info!(
+            "  Pool: {} - Path: {:?}, Capacity: {} GB, Max Objects: {}",
+            pool.id,
+            pool.path,
+            pool.capacity / (1024 * 1024 * 1024),
+            pool.max_objects
+        );
+    }
 
     let pool_manager = Arc::new(
         PoolManager::new(pool_configs, SchedulingStrategy::LeastLoaded).await?,
@@ -94,8 +95,8 @@ async fn main() -> anyhow::Result<()> {
         .layer(axum::middleware::from_fn(logging_middleware))
         .with_state(state.clone());
 
-    // Bind address
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    // Bind address from config
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server.port));
 
     tracing::info!("Server listening on http://{}", addr);
     tracing::info!("  S3 API: http://{}", addr);
