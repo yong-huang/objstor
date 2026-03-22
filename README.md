@@ -1,49 +1,122 @@
 # ObjStor - S3-Compatible Object Storage Simulator
 
-A high-performance, S3-compatible object storage system written in Rust, featuring load balancing, multi-pool storage, and a modern web management interface.
+A high-performance, S3-compatible object storage system written in Rust, featuring multi-pool distributed storage, intelligent load balancing, and a modern web management interface.
+
+![Rust](https://img.shields.io/badge/Rust-1.94+-orange.svg)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
 ## Features
 
-- **S3-Compatible API**: Full S3 protocol support for buckets and objects
-- **Load Balancing**: Smart data distribution across multiple storage pools
-- **Multi-Pool Storage**: Support for multiple storage pools with health monitoring
-- **Web UI**: Modern dashboard for monitoring and management
-- **Real-time Metrics**: WebSocket-based real-time system monitoring
-- **Multipart Upload**: Support for large file uploads
-- **Access Control**: AWS-style signature authentication (AWS4-HMAC-SHA256)
+### Core Features
+- **S3-Compatible API**: Full S3 protocol implementation with XML responses
+  - Bucket operations: List, Create, Delete, Head
+  - Object operations: Put, Get, Delete, Head, Copy
+  - Multipart Upload: Create, Upload Part, Complete, Abort, List Parts
+  - Versioning: GetBucketVersioning, PutBucketVersioning, ListObjectVersions
+  - Tagging: Put/Get/Delete Object Tagging
+  - ACLs: Put/Get Object ACL
+- **Multi-Pool Storage**: Distributed object storage across multiple storage pools
+- **Load Balancing**: Smart scheduling with multiple strategies
+  - Least Loaded: Select pool with lowest usage ratio
+  - Weighted Round Robin: Distribute based on available space
+  - Adaptive: Consider multiple factors (I/O, network, object size)
+- **Access Control**: AWS4-HMAC-SHA256 signature authentication
+
+### Web Management Interface
+- **Dashboard**: Real-time overview with storage usage charts and metrics
+- **Buckets Management**: Create, delete, and browse S3 buckets
+- **Objects Browser**: Upload, download, and delete objects with bucket selector
+- **Monitoring**: Live system metrics with real-time charts
+- **Logs Viewer**: Real-time log streaming via WebSocket
+- **Modern UI**: Custom toast notifications and modal dialogs (no native alerts)
+
+### Technical Features
+- **Real-time Updates**: WebSocket-based metrics (5s) and logs (2s) streaming
+- **SQLite Metadata**: WAL mode for concurrent access and performance
+- **SHA256 Hashing**: Content-addressable storage with deduplication
+- **ETag Calculation**: MD5-based ETag for S3 compatibility
+- **Structured Logging**: tracing-based logging with daily rotation
 
 ## Quick Start
 
 ### Prerequisites
 
-- Rust 1.70 or later
-- Cargo
+- Rust 1.94 or later
+- Cargo (comes with Rust)
+- macOS / Linux / Windows
 
 ### Installation
 
 ```bash
 # Clone the repository
+git clone <repository-url>
 cd objstor
 
-# Build the project
+# Build the project (release mode for better performance)
 cargo build --release
 
 # Run the server
 cargo run --release
 ```
 
-### Usage
+Or for development:
 
-The server starts two endpoints:
+```bash
+# Run with debug logging
+RUST_LOG=debug cargo run
 
-- **Web UI**: http://localhost:8080
-- **S3 API**: http://localhost:9000
+# Run with specific log level
+RUST_LOG=info cargo run
+```
 
-### Default Access Key
+### Access Points
 
-For testing, the system creates a default access key:
-- Access Key ID: `test-access-key`
-- Secret Key: `test-secret-key`
+The server starts multiple services:
+
+- **Web Management UI**: http://localhost:8080/web
+- **S3 API**: http://localhost:8080/
+- **Admin API**: http://localhost:8080/api/v1/
+- **WebSocket**: ws://localhost:8080/ws
+- **Static Assets**: http://localhost:8080/static/
+
+## S3 API Support
+
+### Bucket Operations
+| API | Method | Endpoint | Description |
+|-----|--------|----------|-------------|
+| ListBuckets | GET | / | Lists all buckets |
+| CreateBucket | PUT | /{bucket} | Creates a new bucket |
+| DeleteBucket | DELETE | /{bucket} | Deletes a bucket |
+| HeadBucket | HEAD | /{bucket} | Checks if bucket exists |
+| GetBucketLocation | GET | /{bucket}?location | Gets bucket region |
+
+### Object Operations
+| API | Method | Endpoint | Description |
+|-----|--------|----------|-------------|
+| PutObject | PUT | /{bucket}/{key} | Uploads an object |
+| GetObject | GET | /{bucket}/{key} | Downloads an object |
+| HeadObject | HEAD | /{bucket}/{key} | Gets object metadata |
+| DeleteObject | DELETE | /{bucket}/{key} | Deletes an object |
+| CopyObject | PUT | /{bucket}/{key} | Copies an object |
+
+### Multipart Upload
+| API | Method | Endpoint | Description |
+|-----|--------|----------|-------------|
+| CreateMultipartUpload | POST | /{bucket}/{key}?uploads | Initiates multipart upload |
+| UploadPart | PUT | /{bucket}/{key}?partNumber&uploadId | Uploads a part |
+| CompleteMultipartUpload | POST | /{bucket}/{key}?uploadId | Completes multipart upload |
+| AbortMultipartUpload | DELETE | /{bucket}/{key}?uploadId | Aborts multipart upload |
+| ListParts | GET | /{bucket}/{key}?uploadId | Lists uploaded parts |
+| ListMultipartUploads | GET | /{bucket}?uploads | Lists in-progress uploads |
+
+## Testing
+
+### Default Credentials
+
+The system creates a default access key for testing:
+- **Access Key ID**: `test-access-key`
+- **Secret Key**: `test-secret-key`
+- **Region**: `us-east-1`
 
 ### Testing with AWS CLI
 
@@ -109,59 +182,420 @@ for obj in response.get('Contents', []):
 
 ## Architecture
 
+### System Overview
+
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         ObjStor System                          │
 ├─────────────────────────────────────────────────────────────────┤
-│  S3 Client (AWS SDK/boto3)  →  HTTP/REST API  →  S3 Handler    │
 │                                                                   │
-│  ┌──────────────┐  ┌─────────────┐  ┌──────────┐              │
-│  │  Load        │  │  Storage    │  │ Metadata │              │
-│  │  Balancer    │  │  Pool       │  │  Store   │              │
-│  └──────────────┘  └─────────────┘  └──────────┘              │
-│                                                                   │
-│  Web UI ←→ WebSocket ←→ Real-time Metrics                       │
-└─────────────────────────────────────────────────────────────────┘
+│  ┌────────────────┐      ┌─────────────────┐                    │
+│  │   S3 Client    │──────│  HTTP/REST API  │                    │
+│  │ (AWS SDK/boto3)│      │   (Axum Server) │                    │
+│  └────────────────┘      └────────┬────────┘                    │
+│                                    │                             │
+│                           ┌────────▼────────┐                   │
+│                           │  S3 Protocol    │                   │
+│                           │  Handler Layer  │                   │
+│                           └────────┬────────┘                   │
+│                                    │                             │
+│           ┌────────────────────────┼────────────────────────┐   │
+│           │                        │                        │   │
+│  ┌────────▼────────┐    ┌─────────▼──────┐    ┌──────────▼──┐  │
+│  │ Auth & IAM      │    │ Storage Engine │    │ Scheduler   │  │
+│  │ - Access Keys   │    │ - Object CRUD  │    │ - Load      │  │
+│  │ - Policies      │    │ - Multipart    │    │   Balancing │  │
+│  │ - ACLs          │    │ - Encryption   │    │ - Data      │  │
+│  └────────┬────────┘    └─────────┬──────┘    └──────────┬──┘  │
+│           │                       │                        │    │
+│           │             ┌─────────▼────────────────────────▼──┐ │
+│           │             │         Storage Pool Manager         │ │
+│           │             │  - Pool allocation                  │ │
+│           │             │  - Space management                 │ │
+│           │             │  - Health monitoring                │ │
+│           │             └─────────────┬───────────────────────┘ │
+│           │                           │                          │
+│  ┌────────▼────────┐    ┌─────────────▼───────────────────────┐ │
+│  │ Metadata Store  │    │      Data Storage Layer             │ │
+│  │ (SQLite)        │    │  /data/pools/pool-XXX/objects/     │ │
+│  │ - Buckets       │    └─────────────────────────────────────┘ │
+│  │ - Objects       │                                            │
+│  │ - Users         │    ┌─────────────────┐    ┌────────────┐  │
+│  │ - Policies      │    │   Log System    │    │   Web UI   │  │
+│  └─────────────────┘    │ (tracing)       │    │  Dashboard │  │
+│                         │ - Access logs   │    │ - Monitor  │  │
+│                         │ - Error logs    │    │ - Logs     │  │
+│                         └─────────────────┘    └────────────┘  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Project Structure
+### Project Structure
 
-- `src/config/` - Configuration management
-- `src/storage/` - Storage engine and pool management
-- `src/scheduler/` - Load balancing algorithms
-- `src/metadata/` - SQLite metadata storage
-- `src/auth/` - AWS signature authentication
-- `src/api/s3/` - S3 protocol handlers
-- `src/web/` - Web UI and WebSocket server
-- `src/logging/` - Structured logging
+```
+objstor/
+├── Cargo.toml              # Project dependencies
+├── README.md
+├── CLAUDE.md              # Development guidelines
+│
+├── data/                  # Data storage (created at runtime)
+│   ├── pools/            # Storage pools
+│   │   ├── pool-001/
+│   │   │   ├── objects/ # Object data (content-addressable)
+│   │   │   └── metadata/
+│   │   └── pool-002/
+│   └── metadata.db       # SQLite metadata store
+│
+├── src/
+│   ├── main.rs           # Application entry point
+│   ├── lib.rs
+│   │
+│   ├── config/           # Configuration management
+│   │   ├── mod.rs
+│   │   ├── server.rs
+│   │   └── storage.rs
+│   │
+│   ├── api/              # API layer
+│   │   ├── mod.rs
+│   │   ├── s3/          # S3 protocol handlers
+│   │   │   ├── mod.rs
+│   │   │   ├── auth.rs      # AWS signature verification
+│   │   │   ├── handler.rs   # Main request router
+│   │   │   ├── bucket.rs    # Bucket operations
+│   │   │   ├── object.rs    # Object operations
+│   │   │   ├── multipart.rs # Multipart upload
+│   │   │   └── error.rs     # S3 error responses
+│   │   ├── admin.rs      # Admin API endpoints
+│   │   └── middleware.rs # Logging middleware
+│   │
+│   ├── storage/          # Storage engine
+│   │   ├── mod.rs
+│   │   ├── pool.rs           # Storage pool implementation
+│   │   ├── pool_manager.rs   # Multi-pool coordination
+│   │   ├── object.rs         # Object CRUD operations
+│   │   ├── multipart.rs      # Multipart upload handling
+│   │   ├── version.rs        # Object versioning
+│   │   └── layout.rs         # Storage layout
+│   │
+│   ├── scheduler/        # Load balancing
+│   │   ├── mod.rs
+│   │   ├── load_balancer.rs  # Scheduling strategies
+│   │   ├── placement.rs      # Data placement policies
+│   │   └── metrics.rs        # Performance metrics
+│   │
+│   ├── metadata/         # Metadata storage
+│   │   ├── mod.rs
+│   │   ├── db.rs             # SQLite connection
+│   │   ├── bucket.rs         # Bucket metadata
+│   │   ├── object.rs         # Object metadata
+│   │   ├── user.rs           # User/access keys
+│   │   └── policy.rs         # IAM policies
+│   │
+│   ├── auth/             # Authentication
+│   │   ├── mod.rs
+│   │   ├── signer.rs        # AWS signature parsing
+│   │   ├── iam.rs           # IAM policy engine
+│   │   └── acl.rs           # ACL support
+│   │
+│   ├── logging/          # Logging system
+│   │   ├── mod.rs
+│   │   ├── logger.rs        # Log configuration
+│   │   ├── access.rs        # Access logging
+│   │   ├── audit.rs         # Audit logging
+│   │   └── metrics.rs       # Performance metrics
+│   │
+│   ├── web/              # Web management interface
+│   │   ├── mod.rs
+│   │   ├── server.rs
+│   │   ├── handlers.rs      # Admin API endpoints
+│   │   ├── websocket.rs     # Real-time WebSocket
+│   │   └── static/
+│   │       ├── index.html
+│   │       ├── css/style.css
+│   │       └── js/app.js
+│   │
+│   └── error.rs          # Error types
+│
+├── scripts/             # Utility scripts
+│   ├── init_storage.sh  # Initialize storage directories
+│   └── benchmark.sh     # Performance benchmarking
+│
+└── template/            # UI reference
+    └── omlx_style.html
+```
 
 ## Configuration
 
-The system uses sensible defaults but can be configured:
+### Default Configuration
 
-- Data directory: `./data`
-- Pools: 2 default pools, 100GB each
-- Scheduling: Least-loaded strategy
-- Web UI port: 8080
-- S3 API port: 9000
+- **Data Directory**: `./data`
+- **Storage Pools**: 2 pools, 100GB each
+- **Scheduling Strategy**: Least Loaded
+- **Server Port**: 8080 (both Web UI and S3 API)
+- **Log Level**: info
+- **Log Directory**: `./logs`
 
-## Storage Layout
+### Storage Layout
 
 ```
 data/
 ├── pools/
 │   ├── pool-001/
 │   │   ├── objects/
-│   │   │   └── [hash]/data
-│   │   └── metadata/pool.json
+│   │   │   ├── a3/
+│   │   │   │   └── a3f5b8c2.../     # SHA256 hash prefix
+│   │   │   │       ├── data          # Actual object data
+│   │   │   │       └── meta.json     # Object metadata
+│   │   │   └── 7c/
+│   │   │       └── 7c1d4e9a.../
+│   │   │           ├── data
+│   │   │           └── meta.json
+│   │   └── metadata/
+│   │       └── pool.json             # Pool metadata
 │   └── pool-002/
-└── metadata.db
+└── metadata.db                        # SQLite metadata store
+```
+
+## Development
+
+### Building
+
+```bash
+# Debug build (faster compilation)
+cargo build
+
+# Release build (optimized)
+cargo build --release
+
+# Check compilation without building
+cargo check
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests with output
+cargo test -- --nocapture
+
+# Run specific test
+cargo test test_bucket_creation
+```
+
+### Development Server
+
+```bash
+# Run with debug logging
+RUST_LOG=debug cargo run
+
+# Run with trace logging
+RUST_LOG=trace cargo run
+
+# Run specific module logs
+RUST_LOG=objstor::api=debug,objstor::storage=trace cargo run
+```
+
+### Code Quality
+
+```bash
+# Format code
+cargo fmt
+
+# Check code style
+cargo fmt --check
+
+# Run clippy lints
+cargo clippy
+
+# Run clippy with all features
+cargo clippy --all-features
+```
+
+## Web UI Features
+
+### Dashboard
+- Storage usage summary cards
+- Real-time storage usage chart (Chart.js)
+- Storage pool status with usage bars
+- Auto-refresh via WebSocket (5s interval)
+
+### Buckets Management
+- List all buckets with metadata
+- Create new buckets (with validation)
+- Delete buckets (with confirmation modal)
+- View bucket details (name, region, creation date)
+
+### Objects Browser
+- Bucket selector dropdown
+- Upload objects via file picker
+- Download objects
+- Delete objects (with confirmation)
+- Real-time object count updates
+
+### Monitoring
+- Live storage usage percentage
+- Total objects count (from database)
+- Active pools count
+- Real-time metrics chart
+- Update timestamp
+
+### Logs Viewer
+- Real-time log streaming via WebSocket
+- Color-coded log levels (info, warn, error)
+- Timestamp display
+- Auto-scroll to latest logs
+- 2-second update interval
+
+## Admin API
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/metrics` | GET | System metrics |
+| `/api/v1/buckets` | GET | List buckets |
+| `/api/v1/health` | GET | Health check |
+
+### Metrics Response Example
+
+```json
+{
+  "storage": {
+    "used": 1073741824,
+    "capacity": 214748364800,
+    "usage_ratio": 0.005
+  },
+  "buckets": [
+    {
+      "name": "my-bucket",
+      "created_at": "2024-01-15T10:30:00Z",
+      "region": "us-east-1",
+      "owner": "test-user"
+    }
+  ],
+  "pools": [
+    {
+      "id": "pool-001",
+      "capacity": 107374182400,
+      "used": 536870912,
+      "objects": 5,
+      "status": "Healthy",
+      "usage_ratio": 0.005
+    }
+  ],
+  "total_objects": 10
+}
+```
+
+## Performance
+
+### Benchmarks
+
+Run the included benchmark script:
+
+```bash
+./scripts/benchmark.sh
+```
+
+Expected performance (on modern hardware):
+- Small file uploads (<1MB): ~1000 ops/sec
+- Large file downloads (>100MB): ~500 MB/sec
+- Concurrent connections: 1000+
+
+### Optimization Tips
+
+1. **Use Release Mode**: Always run `cargo run --release` for production
+2. **Enable WAL Mode**: SQLite WAL mode is enabled by default
+3. **Pool Sizing**: Create pools sized for your workload
+4. **Monitoring**: Use the Monitoring page to track performance
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue**: Port 8080 already in use
+```bash
+# Kill existing process
+lsof -ti:8080 | xargs kill -9
+
+# Or use a different port (modify src/main.rs)
+```
+
+**Issue**: Database locked
+```bash
+# Remove WAL files
+rm -f data/metadata.db-shm data/metadata.db-wal
+```
+
+**Issue**: Permission denied on data directory
+```bash
+# Fix permissions
+chmod -R 755 data/
+```
+
+**Issue**: WebSocket connection failed
+- Check browser console for errors
+- Verify `/ws` route is accessible
+- Check firewall settings
+
+## Roadmap
+
+### Planned Features
+
+- [ ] Distributed multi-node support
+- [ ] Erasure coding for data redundancy
+- [ ] Lifecycle management (auto-delete expired objects)
+- [ ] Cross-region replication
+- [ ] Event notifications (SNS-like)
+- [ ] Requester pays functionality
+- [ ] Presigned URLs
+- [ ] Bucket policies
+- [ ] CORS configuration
+- [ ] Website hosting
+- [ ] Request metrics and analytics
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Code Style**: Run `cargo fmt` before committing
+2. **Testing**: Add tests for new features
+3. **Documentation**: Update README and code comments
+4. **Commits**: Use clear commit messages
+
+### Development Workflow
+
+```bash
+# 1. Fork and clone the repository
+git clone <your-fork>
+
+# 2. Create a feature branch
+git checkout -b feature/my-feature
+
+# 3. Make changes and test
+cargo test
+cargo clippy
+
+# 4. Commit changes
+git commit -m "Add my feature"
+
+# 5. Push and create PR
+git push origin feature/my-feature
 ```
 
 ## License
 
 MIT License - see LICENSE file for details
 
-## Contributing
+## Acknowledgments
 
-Contributions are welcome! Please submit pull requests or open issues for bugs and feature requests.
+- Built with [Axum](https://github.com/tokio-rs/axum) web framework
+- S3 protocol compatibility with [AWS SDK](https://aws.amazon.com/sdk/)
+- UI inspired by modern design patterns
+- Chart visualization with [Chart.js](https://www.chartjs.org/)
+
+---
+
+**Made with ❤️ in Rust**
