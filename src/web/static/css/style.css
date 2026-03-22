@@ -3,6 +3,7 @@
     --bg-surface: #f9f9f9;
     --bg-input: #ffffff;
     --bg-header: rgba(255, 255, 255, 0.9);
+    --bg-active: #ffffff;
     --border-color: #e5e7eb;
     --text-main: #111827;
     --text-secondary: #6b7280;
@@ -23,6 +24,7 @@
     --bg-surface: #1f2937;
     --bg-input: #374151;
     --bg-header: rgba(17, 24, 39, 0.95);
+    --bg-active: #4b5563;
     --border-color: #4b5563;
     --text-main: #f9f9f9;
     --text-secondary: #d1d5db;
@@ -85,6 +87,7 @@ header {
     gap: 12px;
     font-weight: 700;
     font-size: 1.25rem;
+    color: var(--text-main);
 }
 
 .logo-version {
@@ -116,9 +119,10 @@ header {
 
 .nav-item:hover { background-color: var(--bg-surface); }
 .nav-item.active {
-    background-color: var(--bg-input);
+    background-color: var(--bg-active);
     color: var(--text-main);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-weight: 600;
 }
 
 .header-actions {
