@@ -4,14 +4,56 @@ class ObjStorApp {
         this.currentPage = 'dashboard';
         this.charts = {};
         this.startTime = Date.now();
+        this.currentTheme = localStorage.getItem('theme') || 'light';
     }
 
     async init() {
+        this.setupTheme();
         this.setupNavigation();
         this.connectWebSocket();
         await this.loadPage('dashboard');
         this.updateUptime();
         setInterval(() => this.updateUptime(), 1000);
+    }
+
+    setupTheme() {
+        // Apply saved theme
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+        this.updateThemeIcon();
+
+        // Setup theme toggle button
+        const toggleBtn = document.getElementById('theme-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => this.toggleTheme());
+        }
+    }
+
+    toggleTheme() {
+        this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', this.currentTheme);
+        localStorage.setItem('theme', this.currentTheme);
+        this.updateThemeIcon();
+
+        // Show toast notification
+        this.showToast(
+            'info',
+            'Theme Changed',
+            `Switched to ${this.currentTheme} mode`,
+            2000
+        );
+    }
+
+    updateThemeIcon() {
+        const sunIcon = document.getElementById('theme-icon-sun');
+        const moonIcon = document.getElementById('theme-icon-moon');
+
+        if (this.currentTheme === 'dark') {
+            sunIcon.style.display = 'none';
+            moonIcon.style.display = 'block';
+        } else {
+            sunIcon.style.display = 'block';
+            moonIcon.style.display = 'none';
+        }
     }
 
     setupNavigation() {
