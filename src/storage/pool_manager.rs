@@ -32,6 +32,17 @@ impl PoolManager {
         Ok(pool.clone())
     }
 
+    /// Select pool for a bucket, optionally using preferred pool
+    pub async fn select_pool_for_bucket(&self, preferred_pool: Option<&str>, size: u64) -> Result<StoragePool> {
+        if let Some(pool_id) = preferred_pool {
+            // Use the preferred pool if specified
+            self.get_pool(pool_id).await
+        } else {
+            // Otherwise use load balancer to select best pool
+            self.select_pool_for_object(size).await
+        }
+    }
+
     pub async fn get_pool(&self, pool_id: &str) -> Result<StoragePool> {
         let pools = self.pools.read().await;
         pools

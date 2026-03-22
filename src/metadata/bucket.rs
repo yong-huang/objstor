@@ -13,6 +13,7 @@ pub struct Bucket {
     pub versioning_enabled: bool,
     pub quota: Option<u64>,
     pub acl: Option<Acl>,
+    pub preferred_pool: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,15 +47,16 @@ impl MetadataStore {
         name: &str,
         owner: &str,
         region: Option<String>,
+        preferred_pool: Option<String>,
     ) -> Result<Bucket> {
         let now = Utc::now().timestamp();
         let region_value = region.clone().unwrap_or_else(|| "us-east-1".to_string());
 
         let conn = self.conn().lock().unwrap();
         conn.execute(
-            "INSERT INTO buckets (name, created_at, owner, region)
-             VALUES (?1, ?2, ?3, ?4)",
-            params![name, now, owner, region_value],
+            "INSERT INTO buckets (name, created_at, owner, region, preferred_pool)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![name, now, owner, region_value, preferred_pool],
         )
         .map_err(Error::DatabaseError)?;
 
@@ -66,6 +68,7 @@ impl MetadataStore {
             versioning_enabled: false,
             quota: None,
             acl: None,
+            preferred_pool,
         })
     }
 
@@ -95,7 +98,7 @@ impl MetadataStore {
         let conn = self.conn().lock().unwrap();
 
         conn.query_row(
-            "SELECT name, created_at, owner, region, versioning_enabled, quota, acl_json
+            "SELECT name, created_at, owner, region, versioning_enabled, quota, acl_json, preferred_pool
              FROM buckets WHERE name = ?1",
             params![name],
             |row| {
@@ -109,6 +112,7 @@ impl MetadataStore {
                     acl: row
                         .get::<_, Option<String>>(6)?
                         .and_then(|s| serde_json::from_str(&s).ok()),
+                    preferred_pool: row.get(7)?,
                 })
             },
         )
@@ -126,7 +130,7 @@ impl MetadataStore {
 
         let mut stmt = conn
             .prepare(
-                "SELECT name, created_at, owner, region, versioning_enabled, quota, acl_json
+                "SELECT name, created_at, owner, region, versioning_enabled, quota, acl_json, preferred_pool
                  FROM buckets",
             )
             .map_err(Error::DatabaseError)?;
@@ -143,6 +147,7 @@ impl MetadataStore {
                     acl: row
                         .get::<_, Option<String>>(6)?
                         .and_then(|s| serde_json::from_str(&s).ok()),
+                    preferred_pool: row.get(7)?,
                 })
             })
             .map_err(Error::DatabaseError)?

@@ -277,6 +277,7 @@ class ObjStorApp {
                     <div class="bucket-meta">
                         <span>Created: ${new Date(bucket.created_at).toLocaleDateString()}</span>
                         <span>Region: ${bucket.region}</span>
+                        ${bucket.preferred_pool ? `<span>Pool: <strong>${bucket.preferred_pool}</strong></span>` : '<span>Pool: <em>Auto-select</em></span>'}
                     </div>
                 </div>
                 <button class="btn btn-light" onclick="deleteBucket('${bucket.name}')">
@@ -635,6 +636,8 @@ class ObjStorApp {
                     <p class="modal-description">${options.message || ''}</p>
                     ${options.warning ? `<p class="modal-warning-text">⚠️ ${options.warning}</p>` : ''}
                 `;
+            } else if (options.type === 'custom') {
+                bodyEl.innerHTML = options.html || '';
             }
 
             // Set footer buttons
@@ -655,6 +658,10 @@ class ObjStorApp {
                         const value = input ? input.value : '';
                         this.closeModal(true, value);
                         resolve(value);
+                    } else if (options.type === 'custom' && options.onConfirm) {
+                        const result = options.onConfirm();
+                        this.closeModal(true);
+                        resolve(result);
                     } else {
                         this.closeModal(true);
                         resolve(true);
@@ -694,28 +701,80 @@ class ObjStorApp {
 
 // Global functions
 async function createBucket() {
-    const name = await app.showModal({
-        type: 'prompt',
+    // Fetch available pools first
+    let pools = [];
+    try {
+        const metricsResponse = await fetch('/api/v1/metrics');
+        const metricsData = await metricsResponse.json();
+        pools = metricsData.pools || [];
+    } catch (error) {
+        console.error('Failed to fetch pools:', error);
+    }
+
+    // Build pool options HTML
+    const poolOptions = pools.map(pool =>
+        `<option value="${pool.id}">${pool.id} (${(pool.used / 1024 / 1024 / 1024).toFixed(2)} GB used, ${(pool.usage_ratio * 100).toFixed(1)}%)</option>`
+    ).join('');
+
+    const result = await app.showModal({
+        type: 'custom',
         title: 'Create Bucket',
-        message: 'Enter a name for the new bucket:',
-        label: 'Bucket Name:',
-        placeholder: 'my-bucket',
+        html: `
+            <p class="modal-description">Enter a name for the new bucket and optionally select a storage pool.</p>
+            <label class="modal-label">Bucket Name:</label>
+            <input type="text" class="modal-input" id="modal-bucket-name" placeholder="my-bucket" style="margin-bottom: 1rem;">
+
+            <details style="margin-bottom: 1rem;">
+                <summary style="cursor: pointer; color: #374151; font-weight: 500; padding: 0.5rem 0;">
+                    Advanced: Storage Pool Selection
+                </summary>
+                <div style="margin-top: 0.5rem;">
+                    <label class="modal-label">Storage Pool (optional):</label>
+                    <select class="modal-input" id="modal-pool-select">
+                        <option value="">Auto-select (Recommended)</option>
+                        ${poolOptions}
+                    </select>
+                    <p class="modal-description" style="margin-top: 0.5rem; font-size: 0.8rem;">
+                        Leave empty to let the system automatically select the best pool based on available space.
+                    </p>
+                </div>
+            </details>
+        `,
         confirmText: 'Create',
-        cancelText: 'Cancel'
+        cancelText: 'Cancel',
+        onConfirm: () => {
+            const nameInput = document.getElementById('modal-bucket-name');
+            const poolSelect = document.getElementById('modal-pool-select');
+            return {
+                name: nameInput ? nameInput.value : '',
+                poolId: poolSelect ? poolSelect.value : ''
+            };
+        }
     });
-    if (!name) return;
+
+    if (!result || !result.name) return;
+
+    const { name, poolId } = result;
 
     try {
+        const headers = {
+            'Content-Type': 'application/xml'
+        };
+
+        // Add pool header if specified
+        if (poolId) {
+            headers['x-amz-bucket-pool'] = poolId;
+        }
+
         const response = await fetch(`/${encodeURIComponent(name)}`, {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/xml'
-            },
+            headers: headers,
             body: `<?xml version="1.0" encoding="UTF-8"?><CreateBucketConfiguration><LocationConstraint>us-east-1</LocationConstraint></CreateBucketConfiguration>`
         });
 
         if (response.ok) {
-            app.showToast('success', 'Bucket Created', `Bucket "${name}" has been created successfully.`);
+            const poolMsg = poolId ? ` (on pool ${poolId})` : '';
+            app.showToast('success', 'Bucket Created', `Bucket "${name}" has been created successfully${poolMsg}.`);
             app.loadBuckets();
         } else {
             const status = response.status;
@@ -725,6 +784,8 @@ async function createBucket() {
                 errorMessage = `Bucket "${name}" already exists.`;
             } else if (status === 400) {
                 errorMessage = `Invalid bucket name "${name}". Bucket names must be DNS-compliant.`;
+            } else if (status === 404) {
+                errorMessage = `Pool "${poolId}" not found.`;
             } else {
                 const errorText = await response.text();
                 errorMessage = errorText || `Failed to create bucket: ${status}`;

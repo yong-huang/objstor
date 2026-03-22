@@ -16,14 +16,15 @@ pub async fn handle_put_object(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response> {
-    // Verify bucket exists
-    state.metadata.get_bucket(&bucket)?;
+    // Get bucket metadata to check preferred pool
+    let bucket_metadata = state.metadata.get_bucket(&bucket)?;
+    let preferred_pool = bucket_metadata.preferred_pool.as_deref();
 
     // Calculate ETag (MD5 hash)
     let etag = format!("{:x}", md5::Md5::digest(&body));
 
-    // Store object
-    let mut pool = state.pool_manager.select_pool_for_object(body.len() as u64).await?;
+    // Store object using bucket's preferred pool or load balancer
+    let mut pool = state.pool_manager.select_pool_for_bucket(preferred_pool, body.len() as u64).await?;
     let location = pool.write_object(&body).await?;
 
     // Create metadata

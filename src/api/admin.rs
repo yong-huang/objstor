@@ -25,6 +25,7 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
                 "created_at": b.created_at.to_rfc3339(),
                 "region": b.region,
                 "owner": b.owner,
+                "preferred_pool": b.preferred_pool,
             })
         })
         .collect();
@@ -74,6 +75,7 @@ pub async fn get_buckets_api(State(state): State<S3AppState>) -> impl IntoRespon
                 "region": b.region,
                 "owner": b.owner,
                 "versioning_enabled": b.versioning_enabled,
+                "preferred_pool": b.preferred_pool,
             })
         })
         .collect();

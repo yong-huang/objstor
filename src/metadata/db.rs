@@ -41,11 +41,18 @@ impl MetadataStore {
                 region TEXT DEFAULT 'us-east-1',
                 versioning_enabled INTEGER DEFAULT 0,
                 quota INTEGER,
-                acl_json TEXT
+                acl_json TEXT,
+                preferred_pool TEXT
             )",
             [],
         )
         .map_err(Error::DatabaseError)?;
+
+        // Add preferred_pool column if table exists without it (for backward compatibility)
+        let _ = conn.execute(
+            "ALTER TABLE buckets ADD COLUMN preferred_pool TEXT",
+            [],
+        );
 
         // Objects table
         conn.execute(

@@ -99,8 +99,27 @@ pub async fn handle_create_bucket(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("us-east-1");
 
+    // Get preferred pool from headers (optional)
+    let preferred_pool = headers
+        .get("x-amz-bucket-pool")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // Validate pool if specified
+    if let Some(ref pool_id) = preferred_pool {
+        let pools = state.pool_manager.get_all_pools().await;
+        if !pools.iter().any(|p| &p.id == pool_id) {
+            return Err(crate::error::Error::InvalidRequest(format!("Pool '{}' not found", pool_id)));
+        }
+    }
+
     // Create bucket
-    state.metadata.create_bucket(&bucket_name, "owner", Some(region.to_string()))?;
+    state.metadata.create_bucket(
+        &bucket_name,
+        "owner",
+        Some(region.to_string()),
+        preferred_pool,
+    )?;
 
     Ok((
         StatusCode::OK,
