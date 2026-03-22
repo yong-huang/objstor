@@ -58,6 +58,40 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))
                 .unwrap_or(0);
 
+            // Count objects per pool from database (more accurate than pool.objects_count)
+            let pool_metrics: Vec<serde_json::Value> = pools.iter().map(|p| {
+                // Query actual object count for this pool from database
+                let pool_objects: u64 = state.metadata.conn()
+                    .lock()
+                    .unwrap()
+                    .query_row(
+                        "SELECT COUNT(*) FROM objects WHERE pool_id = ?1",
+                        &[&p.id],
+                        |row| row.get(0)
+                    )
+                    .unwrap_or(0);
+
+                // Query actual used space for this pool from database
+                let pool_used: u64 = state.metadata.conn()
+                    .lock()
+                    .unwrap()
+                    .query_row(
+                        "SELECT COALESCE(SUM(size), 0) FROM objects WHERE pool_id = ?1",
+                        &[&p.id],
+                        |row| row.get(0)
+                    )
+                    .unwrap_or(0);
+
+                json!({
+                    "id": p.id,
+                    "capacity": p.capacity,
+                    "used": pool_used,
+                    "objects": pool_objects,
+                    "status": format!("{:?}", p.status),
+                    "usage_ratio": if p.capacity > 0 { pool_used as f64 / p.capacity as f64 } else { 0.0 },
+                })
+            }).collect();
+
             let metrics = json!({
                 "type": "metrics",
                 "data": {
@@ -67,16 +101,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                         "usage_ratio": if capacity > 0 { used as f64 / capacity as f64 } else { 0.0 }
                     },
                     "buckets": buckets_data,
-                    "pools": pools.iter().map(|p| {
-                        json!({
-                            "id": p.id,
-                            "capacity": p.capacity,
-                            "used": p.used,
-                            "objects": p.objects_count,
-                            "status": format!("{:?}", p.status),
-                            "usage_ratio": p.usage_ratio(),
-                        })
-                    }).collect::<Vec<_>>(),
+                    "pools": pool_metrics,
                     "total_objects": total_objects,
                 }
             });

@@ -37,16 +37,39 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
         .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))
         .unwrap_or(0);
 
+    // Query actual pool statistics from database for accuracy
     let pool_metrics: Vec<serde_json::Value> = pools
         .iter()
         .map(|p| {
+            // Query actual object count for this pool from database
+            let pool_objects: u64 = state.metadata.conn()
+                .lock()
+                .unwrap()
+                .query_row(
+                    "SELECT COUNT(*) FROM objects WHERE pool_id = ?1",
+                    &[&p.id],
+                    |row| row.get(0)
+                )
+                .unwrap_or(0);
+
+            // Query actual used space for this pool from database
+            let pool_used: u64 = state.metadata.conn()
+                .lock()
+                .unwrap()
+                .query_row(
+                    "SELECT COALESCE(SUM(size), 0) FROM objects WHERE pool_id = ?1",
+                    &[&p.id],
+                    |row| row.get(0)
+                )
+                .unwrap_or(0);
+
             serde_json::json!({
                 "id": p.id,
                 "capacity": p.capacity,
-                "used": p.used,
-                "objects": p.objects_count,
+                "used": pool_used,
+                "objects": pool_objects,
                 "status": format!("{:?}", p.status),
-                "usage_ratio": p.usage_ratio(),
+                "usage_ratio": if p.capacity > 0 { pool_used as f64 / p.capacity as f64 } else { 0.0 },
             })
         })
         .collect();
