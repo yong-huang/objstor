@@ -37,8 +37,8 @@ impl MetadataStore {
         let conn = self.conn().lock().unwrap();
 
         let now = Utc::now().timestamp();
-        let tags_json = obj.tags.as_ref().map(|t| serde_json::to_string(t)).transpose()?;
-        let metadata_json = obj.metadata.as_ref().map(|m| serde_json::to_string(m)).transpose()?;
+        let tags_json = obj.tags.as_ref().map(serde_json::to_string).transpose()?;
+        let metadata_json = obj.metadata.as_ref().map(serde_json::to_string).transpose()?;
 
         conn.execute(
             "INSERT INTO objects (bucket, key, version_id, object_hash, size, content_type, etag, created_at, modified_at, pool_id, storage_class, tags_json, metadata_json)

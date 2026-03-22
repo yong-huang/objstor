@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::storage::pool::StoragePool;
 
 pub trait PlacementStrategy {

@@ -1,8 +1,7 @@
 use axum::{
     extract::{Request, State},
-    http::{Method, StatusCode},
+    http::StatusCode,
     response::Response,
-    routing::any,
     Router,
 };
 use objstor::{
@@ -128,7 +127,7 @@ async fn s3_handler_wrap(
     };
 
     objstor::api::s3::handler::S3Handler::handle_request(
-        Method::from(parts.method),
+        parts.method,
         parts.uri,
         parts.headers,
         body_bytes,

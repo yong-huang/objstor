@@ -5,44 +5,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Serialize)]
-struct ListAllMyBucketsResult {
-    #[serde(rename = "Owner")]
-    owner: Owner,
-    #[serde(rename = "Buckets")]
-    buckets: Buckets,
-}
-
-#[derive(Debug, Serialize)]
-struct Owner {
-    #[serde(rename = "ID")]
-    id: String,
-    #[serde(rename = "DisplayName")]
-    display_name: String,
-}
-
-#[derive(Debug, Serialize)]
-struct Buckets {
-    #[serde(rename = "Bucket", default)]
-    bucket: Vec<Bucket>,
-}
-
-#[derive(Debug, Serialize)]
-struct Bucket {
-    #[serde(rename = "Name")]
-    name: String,
-    #[serde(rename = "CreationDate")]
-    creation_date: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CreateBucketConfiguration {
-    #[serde(rename = "LocationConstraint")]
-    location_constraint: Option<String>,
-}
-
 pub async fn handle_list_buckets(State(state): State<S3AppState>) -> Result<Response> {
     let buckets = state.metadata.list_buckets()?;
 

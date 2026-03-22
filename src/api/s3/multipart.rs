@@ -5,12 +5,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize)]
-struct UploadQuery {
-    uploadId: Option<String>,
-}
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 struct InitiateMultipartUploadResult {

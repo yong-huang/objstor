@@ -58,18 +58,17 @@ cargo run
 ```
 
 The server will start on:
-- **Web UI**: http://localhost:8080
-- **S3 API**: http://localhost:9000
+- **Web UI**: http://localhost:8080/web
+- **S3 API**: http://localhost:8080/ (same port, different path)
 
 ## Troubleshooting
 
 ### Port Already in Use
 
-If ports 8080 or 9000 are already in use, you can change them in `src/main.rs`:
+If port 8080 is already in use, you can change it in `src/main.rs`:
 
 ```rust
-let web_addr = SocketAddr::from(([0, 0, 0, 0], 8080));  // Change this
-let s3_addr = SocketAddr::from(([0, 0, 0, 0], 9000));  // And this
+let addr = SocketAddr::from(([0, 0, 0, 0], 8080));  // Change this
 ```
 
 ### Build Errors

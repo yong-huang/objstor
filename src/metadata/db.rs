@@ -1,9 +1,10 @@
 use crate::error::{Error, Result};
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct DbError(rusqlite::Error);
 
 impl From<rusqlite::Error> for DbError {
@@ -18,10 +19,10 @@ pub struct MetadataStore {
 
 impl MetadataStore {
     pub fn new(db_path: &Path) -> Result<Self> {
-        let conn = Connection::open(db_path).map_err(|e| Error::DatabaseError(e))?;
+        let conn = Connection::open(db_path).map_err(Error::DatabaseError)?;
 
         // Enable WAL mode for better concurrency (use query to handle returned results)
-        let _ = conn.query_row("PRAGMA journal_mode=WAL", [], |_row| Ok(())).map_err(Error::DatabaseError)?;
+        conn.query_row("PRAGMA journal_mode=WAL", [], |_row| Ok(())).map_err(Error::DatabaseError)?;
 
         // Create tables
         Self::init_schema(&conn)?;

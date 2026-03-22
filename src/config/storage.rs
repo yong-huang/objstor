@@ -1,6 +1,6 @@
 use crate::storage::pool::PoolConfig;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageConfig {

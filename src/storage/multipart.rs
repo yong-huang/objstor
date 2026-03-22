@@ -22,6 +22,7 @@ pub struct UploadPart {
     pub etag: String,
 }
 
+#[derive(Default)]
 pub struct MultipartUploadManager {
     uploads: HashMap<String, MultipartUpload>,
     parts: HashMap<String, HashMap<u32, UploadPart>>,
@@ -29,10 +30,7 @@ pub struct MultipartUploadManager {
 
 impl MultipartUploadManager {
     pub fn new() -> Self {
-        Self {
-            uploads: HashMap::new(),
-            parts: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn create_upload(

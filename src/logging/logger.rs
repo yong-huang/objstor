@@ -1,6 +1,5 @@
 use crate::config::ServerConfig;
 use crate::error::Result;
-use std::path::PathBuf;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 

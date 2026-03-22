@@ -8,7 +8,7 @@ use axum::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use md5::{Digest, Md5};
+use md5::Digest;
 
 pub async fn handle_put_object(
     State(state): State<S3AppState>,

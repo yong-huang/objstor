@@ -17,17 +17,13 @@ pub struct Object {
 
 pub struct ObjectWriter {
     pool_manager: PoolManager,
-    bucket: String,
-    key: String,
     data: Vec<u8>,
 }
 
 impl ObjectWriter {
-    pub fn new(pool_manager: PoolManager, bucket: String, key: String) -> Self {
+    pub fn new(pool_manager: PoolManager) -> Self {
         Self {
             pool_manager,
-            bucket,
-            key,
             data: Vec::new(),
         }
     }

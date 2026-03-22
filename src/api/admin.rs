@@ -47,7 +47,7 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
                 .unwrap()
                 .query_row(
                     "SELECT COUNT(*) FROM objects WHERE pool_id = ?1",
-                    &[&p.id],
+                    [&p.id],
                     |row| row.get(0)
                 )
                 .unwrap_or(0);
@@ -58,7 +58,7 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
                 .unwrap()
                 .query_row(
                     "SELECT COALESCE(SUM(size), 0) FROM objects WHERE pool_id = ?1",
-                    &[&p.id],
+                    [&p.id],
                     |row| row.get(0)
                 )
                 .unwrap_or(0);

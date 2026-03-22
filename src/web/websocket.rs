@@ -66,7 +66,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                     .unwrap()
                     .query_row(
                         "SELECT COUNT(*) FROM objects WHERE pool_id = ?1",
-                        &[&p.id],
+                        [&p.id],
                         |row| row.get(0)
                     )
                     .unwrap_or(0);
@@ -77,7 +77,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                     .unwrap()
                     .query_row(
                         "SELECT COALESCE(SUM(size), 0) FROM objects WHERE pool_id = ?1",
-                        &[&p.id],
+                        [&p.id],
                         |row| row.get(0)
                     )
                     .unwrap_or(0);
@@ -122,15 +122,15 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
 
             // Generate sample log entries based on counter
             let (level, message) = match counter % 10 {
-                0 => ("info", format!("System health check completed")),
+                0 => ("info", "System health check completed".to_string()),
                 1 => ("info", format!("Processing request #{}", counter)),
                 2 => ("info", format!("Storage usage: {}%", counter % 100)),
                 3 => ("warn", format!("High memory usage: {}%", 80 + (counter % 20))),
                 4 => ("info", format!("Active connections: {}", 10 + (counter % 50))),
-                5 => ("info", format!("Bucket access: test-bucket")),
+                5 => ("info", "Bucket access: test-bucket".to_string()),
                 6 => ("info", format!("Object uploaded: file-{}.txt", counter)),
-                7 => ("info", format!("GET /api/v1/metrics - 200 OK")),
-                8 => ("info", format!("WebSocket client connected")),
+                7 => ("info", "GET /api/v1/metrics - 200 OK".to_string()),
+                8 => ("info", "WebSocket client connected".to_string()),
                 _ => ("info", format!("Background task #{} completed", counter)),
             };
 
@@ -151,7 +151,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
     let mut rx = tx.subscribe();
 
     // Task to send messages to client
-    let mut send_task = tokio::spawn(async move {
+    let send_task = tokio::spawn(async move {
         while let Ok(msg) = rx.recv().await {
             if sender
                 .send(Message::Text(msg.to_string()))
@@ -164,7 +164,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
     });
 
     // Task to handle messages from client
-    let mut recv_task = tokio::spawn(async move {
+    let recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Text(text) => {

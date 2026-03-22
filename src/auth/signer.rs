@@ -6,6 +6,19 @@ use std::collections::HashMap;
 
 type HmacSha256 = Hmac<Sha256>;
 
+struct SigningParams {
+    date: String,
+    region: String,
+}
+
+struct RequestContext<'a> {
+    method: &'a str,
+    uri: &'a str,
+    headers: &'a HashMap<String, String>,
+    signed_headers: &'a str,
+    body: &'a [u8],
+}
+
 pub struct Signer {
     metadata_store: MetadataStore,
 }
@@ -40,12 +53,12 @@ impl Signer {
         let mut signature = "";
 
         for part in parts {
-            if part.starts_with("Credential=") {
-                credential = &part["Credential=".len()..];
-            } else if part.starts_with("SignedHeaders=") {
-                signed_headers = &part["SignedHeaders=".len()..];
-            } else if part.starts_with("Signature=") {
-                signature = &part["Signature=".len()..];
+            if let Some(value) = part.strip_prefix("Credential=") {
+                credential = value;
+            } else if let Some(value) = part.strip_prefix("SignedHeaders=") {
+                signed_headers = value;
+            } else if let Some(value) = part.strip_prefix("Signature=") {
+                signature = value;
             }
         }
 
@@ -69,15 +82,21 @@ impl Signer {
         let secret_key = &access_key.secret_key;
 
         // Calculate expected signature
-        let expected_signature = self.calculate_signature(
+        let signing_params = SigningParams {
+            date: date.to_string(),
+            region: region.to_string(),
+        };
+        let request_ctx = RequestContext {
             method,
             uri,
             headers,
             signed_headers,
             body,
+        };
+        let expected_signature = self.calculate_signature(
+            &request_ctx,
             secret_key,
-            date,
-            region,
+            &signing_params,
         )?;
 
         if expected_signature != signature {
@@ -89,35 +108,30 @@ impl Signer {
 
     fn calculate_signature(
         &self,
-        method: &str,
-        uri: &str,
-        headers: &HashMap<String, String>,
-        signed_headers: &str,
-        body: &[u8],
+        request_ctx: &RequestContext,
         secret_key: &str,
-        date: &str,
-        region: &str,
+        signing_params: &SigningParams,
     ) -> Result<String> {
         // 1. Create canonical request
-        let canonical_uri = uri;
+        let canonical_uri = request_ctx.uri;
         let canonical_querystring = "";
-        let canonical_headers = self.create_canonical_headers(headers, signed_headers)?;
-        let signed_headers_list = signed_headers;
+        let canonical_headers = self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
+        let signed_headers_list = request_ctx.signed_headers;
 
         // Hash payload
-        let payload_hash = hex::encode(sha2::Sha256::digest(body));
+        let payload_hash = hex::encode(sha2::Sha256::digest(request_ctx.body));
 
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\n{}",
-            method, canonical_uri, canonical_querystring, canonical_headers, signed_headers_list, payload_hash
+            request_ctx.method, canonical_uri, canonical_querystring, canonical_headers, signed_headers_list, payload_hash
         );
 
         // 2. Create string to sign
         let algorithm = "AWS4-HMAC-SHA256";
-        let datetime = headers
+        let datetime = request_ctx.headers
             .get("x-amz-date")
             .ok_or_else(|| Error::MissingHeader("x-amz-date".to_string()))?;
-        let credential_scope = format!("{}/{}/{}/aws4_request", date, region, "s3");
+        let credential_scope = format!("{}/{}/{}/aws4_request", signing_params.date, signing_params.region, "s3");
         let hashed_canonical_request = hex::encode(sha2::Sha256::digest(canonical_request.as_bytes()));
 
         let string_to_sign = format!(
@@ -126,8 +140,8 @@ impl Signer {
         );
 
         // 3. Calculate signature
-        let k_date = Self::hmac_sha256(format!("AWS4{}", secret_key).as_bytes(), date.as_bytes())?;
-        let k_region = Self::hmac_sha256(&k_date, region.as_bytes())?;
+        let k_date = Self::hmac_sha256(format!("AWS4{}", secret_key).as_bytes(), signing_params.date.as_bytes())?;
+        let k_region = Self::hmac_sha256(&k_date, signing_params.region.as_bytes())?;
         let k_service = Self::hmac_sha256(&k_region, "s3".as_bytes())?;
         let k_signing = Self::hmac_sha256(&k_service, b"aws4_request")?;
 

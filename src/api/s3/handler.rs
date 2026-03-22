@@ -1,4 +1,4 @@
-use crate::api::s3::{bucket, multipart, object};
+use crate::api::s3::{bucket, object};
 use crate::storage::multipart::MultipartUploadManager;
 use axum::{
     extract::{Path, State},
