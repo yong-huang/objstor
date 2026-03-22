@@ -8,12 +8,12 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      # Mount data directory for persistence
-      - objstor_data:/app/data
+      # Mount storage directory for pools (mapped to host directory)
+      - /Users/hyhit/Desktop/workspace/storage:/app/storage
+      # Mount data directory for metadata and config
+      - ./data:/app/data
       # Mount logs directory
-      - objstor_logs:/app/logs
-      # Optional: Mount custom config
-      # - ./objstor.json:/app/data/config/objstor.json:ro
+      - ./logs:/app/logs
     environment:
       - RUST_LOG=info
       - OBJSTOR_DATA_DIR=/app/data
@@ -55,10 +55,6 @@ services:
   #     - objstor_network
 
 volumes:
-  objstor_data:
-    driver: local
-  objstor_logs:
-    driver: local
   # prometheus_data:
   #   driver: local
   # grafana_data:
