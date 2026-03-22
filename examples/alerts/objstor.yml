@@ -1,0 +1,64 @@
+# Prometheus alert rules for ObjStor
+
+groups:
+  - name: objstor_alerts
+    interval: 30s
+    rules:
+      # Storage usage alerts
+      - alert: ObjStorStorageHighUsage
+        expr: objstor_storage_usage_ratio > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ObjStor storage usage is high"
+          description: "Storage usage is {{ $value }}% on {{ $labels.instance }}"
+
+      - alert: ObjStorStorageCritical
+        expr: objstor_storage_usage_ratio > 0.95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ObjStor storage is critically full"
+          description: "Storage usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Pool health alerts
+      - alert: ObjStorPoolUnhealthy
+        expr: objstor_pool_healthy == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ObjStor pool is unhealthy"
+          description: "Pool {{ $labels.pool_id }} is unhealthy on {{ $labels.instance }}"
+
+      # Service availability alerts
+      - alert: ObjStorServiceDown
+        expr: up{job="objstor"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ObjStor service is down"
+          description: "ObjStor service has been down for more than 2 minutes"
+
+      # Performance alerts
+      - alert: ObjStorHighLatency
+        expr: histogram_quantile(0.95, rate(objstor_request_duration_seconds_bucket[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ObjStor high request latency"
+          description: "P95 latency is {{ $value }}s on {{ $labels.instance }}"
+
+      # Object count alerts
+      - alert: ObjStorTooManyObjects
+        expr: objstor_objects_total > 900000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "ObjStor approaching object limit"
+          description: "Object count is {{ $value }} on {{ $labels.instance }}"

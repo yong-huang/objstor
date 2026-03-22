@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Tests and benchmarks
+tests/
+benches/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts (not needed in Docker context)
+target/
+Cargo.lock
+
+# Data and logs (will be mounted as volumes)
+data/
+logs/
+
+# Scripts (not needed in image)
+scripts/
+
+# Templates
+template/
+
+# Examples (not needed in image)
+examples/
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore

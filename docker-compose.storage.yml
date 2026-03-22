@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  objstor:
+    image: objstor:latest
+    container_name: objstor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount multiple storage volumes
+      - pool1_data:/app/data/pools/pool-001
+      - pool2_data:/app/data/pools/pool-002
+      - pool3_data:/app/data/pools/pool-003
+      - config_data:/app/data/config
+      - logs_data:/app/logs
+    environment:
+      - RUST_LOG=info
+      - OBJSTOR_DATA_DIR=/app/data
+    networks:
+      - objstor_network
+
+volumes:
+  pool1_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/disk1/objstor
+  pool2_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/disk2/objstor
+  pool3_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/disk3/objstor
+  config_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  objstor_network:
+    driver: bridge

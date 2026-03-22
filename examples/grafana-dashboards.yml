@@ -1,0 +1,11 @@
+# Grafana dashboard provisioning
+
+apiVersion: 1
+
+providers:
+  - name: 'ObjStor'
+    orgId: 1
+    folder: ''
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
