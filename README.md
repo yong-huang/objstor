@@ -39,45 +39,70 @@ A high-performance, S3-compatible object storage system written in Rust, featuri
 
 ## Quick Start
 
-### Prerequisites
-
-- Rust 1.94 or later
-- Cargo (comes with Rust)
-- macOS / Linux / Windows
-
-### Installation
+### Option 1: Docker Deployment (Recommended)
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/yong-huang/objstor.git
 cd objstor
 
-# Build the project (release mode for better performance)
+# Build and run with Docker Compose
+docker-compose up -d
+
+# Access the web UI
+open http://localhost:8080
+```
+
+See [docs/DOCKER.md](docs/DOCKER.md) for detailed Docker deployment options.
+
+### Option 2: Native Installation
+
+#### Prerequisites
+
+- Rust 1.70 or later
+- Cargo (comes with Rust)
+- macOS / Linux / Windows
+
+#### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/yong-huang/objstor.git
+cd objstor
+
+# Configure storage pools (optional)
+./scripts/configure.sh
+
+# Build the project
 cargo build --release
 
 # Run the server
-cargo run --release
-```
-
-Or for development:
-
-```bash
-# Run with debug logging
-RUST_LOG=debug cargo run
-
-# Run with specific log level
-RUST_LOG=info cargo run
+./target/release/objstor
 ```
 
 ### Access Points
 
 The server starts multiple services:
 
-- **Web Management UI**: http://localhost:8080/web
+- **Web Management UI**: http://localhost:8080
 - **S3 API**: http://localhost:8080/
 - **Admin API**: http://localhost:8080/api/v1/
 - **WebSocket**: ws://localhost:8080/ws
-- **Static Assets**: http://localhost:8080/static/
+- **Health Check**: http://localhost:8080/health
+
+### Using Makefile
+
+```bash
+# Show all available commands
+make help
+
+# Common operations
+make build          # Build the project
+make run            # Run the server
+make docker-build   # Build Docker image
+make docker-run     # Run Docker container
+make init           # Initialize configuration
+```
 
 ## S3 API Support
 
@@ -127,25 +152,25 @@ export AWS_SECRET_ACCESS_KEY=test-secret-key
 export AWS_DEFAULT_REGION=us-east-1
 
 # List buckets
-aws s3 ls --endpoint-url http://localhost:9000
+aws s3 ls --endpoint-url http://localhost:8080
 
 # Create a bucket
-aws s3 mb s3://my-bucket --endpoint-url http://localhost:9000
+aws s3 mb s3://my-bucket --endpoint-url http://localhost:8080
 
 # Upload a file
-aws s3 cp file.txt s3://my-bucket/ --endpoint-url http://localhost:9000
+aws s3 cp file.txt s3://my-bucket/ --endpoint-url http://localhost:8080
 
 # Download a file
-aws s3 cp s3://my-bucket/file.txt . --endpoint-url http://localhost:9000
+aws s3 cp s3://my-bucket/file.txt . --endpoint-url http://localhost:8080
 
 # List objects
-aws s3 ls s3://my-bucket --endpoint-url http://localhost:9000
+aws s3 ls s3://my-bucket --endpoint-url http://localhost:8080
 
 # Delete a file
-aws s3 rm s3://my-bucket/file.txt --endpoint-url http://localhost:9000
+aws s3 rm s3://my-bucket/file.txt --endpoint-url http://localhost:8080
 
 # Delete a bucket
-aws s3 rb s3://my-bucket --endpoint-url http://localhost:9000
+aws s3 rb s3://my-bucket --endpoint-url http://localhost:8080
 ```
 
 ### Testing with boto3 (Python)
@@ -155,7 +180,7 @@ import boto3
 
 # Create S3 client
 s3 = boto3.client('s3',
-    endpoint_url='http://localhost:9000',
+    endpoint_url='http://localhost:8080',
     aws_access_key_id='test-access-key',
     aws_secret_access_key='test-secret-key',
     region_name='us-east-1'
@@ -318,20 +343,81 @@ objstor/
 │
 ├── scripts/             # Utility scripts
 │   ├── init_storage.sh  # Initialize storage directories
+│   ├── configure.sh     # Quick configuration
+│   ├── init_config.sh   # Interactive configuration wizard
+│   ├── docker-build.sh  # Build Docker image
+│   ├── docker-push.sh   # Push to registry
 │   └── benchmark.sh     # Performance benchmarking
 │
-└── template/            # UI reference
-    └── omlx_style.html
+├── docker-compose.yml              # Standard Docker deployment
+├── docker-compose.dev.yml          # Development environment
+├── docker-compose.storage.yml      # Multi-volume storage
+├── Dockerfile                      # Container image
+├── Makefile                        # Build automation
+│
+├── docs/                # Documentation
+│   ├── CONFIGURATION.md  # Configuration guide
+│   ├── DOCKER.md         # Docker deployment guide
+│   └── POOL_CONFIG_GUIDE.md  # Pool configuration implementation
+│
+└── examples/            # Example configurations
+    ├── storage.example.json
+    ├── docker-compose-metrics.yml
+    ├── prometheus.yml
+    └── grafana-*.yml
 ```
 
 ## Configuration
+
+### Quick Configuration
+
+```bash
+# Run the configuration wizard
+./scripts/configure.sh
+
+# Or manually edit the config file
+vim data/config/objstor.json
+```
+
+### Configuration File
+
+The system uses a JSON configuration file located at `data/config/objstor.json`:
+
+```json
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "log_level": "info",
+    "log_dir": "./logs"
+  },
+  "storage": {
+    "data_dir": "./data",
+    "pools": [
+      {
+        "id": "pool-001",
+        "path": "./data/pools/pool-001",
+        "capacity": 107374182400,
+        "max_objects": 1000000,
+        "quota_enabled": false
+      }
+    ],
+    "scheduler": {
+      "strategy": "least_loaded",
+      "rebalance_threshold": 0.2
+    }
+  }
+}
+```
+
+For detailed configuration options, see [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 ### Default Configuration
 
 - **Data Directory**: `./data`
 - **Storage Pools**: 2 pools, 100GB each
 - **Scheduling Strategy**: Least Loaded
-- **Server Port**: 8080 (both Web UI and S3 API)
+- **Server Port**: 8080
 - **Log Level**: info
 - **Log Directory**: `./logs`
 
@@ -339,6 +425,8 @@ objstor/
 
 ```
 data/
+├── config/
+│   └── objstor.json              # Main configuration file
 ├── pools/
 │   ├── pool-001/
 │   │   ├── objects/
@@ -356,9 +444,44 @@ data/
 └── metadata.db                        # SQLite metadata store
 ```
 
+### Pool Configuration
+
+Pools can be configured with custom paths and capacities:
+
+```json
+{
+  "pools": [
+    {
+      "id": "ssd-hot",
+      "path": "/fast/ssd/objstor",
+      "capacity": 536870912000,
+      "max_objects": 5000000,
+      "quota_enabled": false
+    },
+    {
+      "id": "hdd-cold",
+      "path": "/slow/hdd/objstor",
+      "capacity": 2199023255552,
+      "max_objects": 50000000,
+      "quota_enabled": true
+    }
+  ]
+}
+```
+
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for more examples.
+
 ## Development
 
-### Building
+### Quick Development Setup
+
+```bash
+# Run with hot reload
+RUST_LOG=debug cargo run
+
+# Or use Make
+make run
+```
 
 ```bash
 # Debug build (faster compilation)
@@ -511,9 +634,15 @@ Expected performance (on modern hardware):
 3. **Pool Sizing**: Create pools sized for your workload
 4. **Monitoring**: Use the Monitoring page to track performance
 
-## Troubleshooting
+## Documentation
 
-### Common Issues
+- [BUILD.md](BUILD.md) - Build and setup guide
+- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) - Configuration guide
+- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment
+- [docs/POOL_CONFIG_GUIDE.md](docs/POOL_CONFIG_GUIDE.md) - Pool configuration
+- [CLAUDE.md](CLAUDE.md) - Development guidelines
+
+## Troubleshooting
 
 **Issue**: Port 8080 already in use
 ```bash
