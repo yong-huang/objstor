@@ -36,10 +36,9 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
         loop {
             interval.tick().await;
 
-            // Send metrics update
+            // Get all pools
             let pools: Vec<crate::storage::pool::StoragePool> =
                 state.pool_manager.get_all_pools().await;
-            let (used, capacity) = state.pool_manager.get_total_usage().await;
 
             // Get buckets list
             let buckets = state.metadata.list_buckets().unwrap_or_default();
@@ -64,7 +63,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))
                 .unwrap_or(0);
 
-            // Count objects per pool from database (more accurate than pool.objects_count)
+            // Count objects and used space per pool from database (more accurate than pool.objects_count)
             let pool_metrics: Vec<serde_json::Value> = pools.iter().map(|p| {
                 // Query actual object count for this pool from database
                 let pool_objects: u64 = state.metadata.conn()
@@ -98,13 +97,21 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 })
             }).collect();
 
+            // Calculate total storage from pool metrics (from database, not in-memory values)
+            let total_used: u64 = pool_metrics.iter()
+                .filter_map(|p| p["used"].as_u64())
+                .sum();
+            let total_capacity: u64 = pool_metrics.iter()
+                .filter_map(|p| p["capacity"].as_u64())
+                .sum();
+
             let metrics = json!({
                 "type": "metrics",
                 "data": {
                     "storage": {
-                        "used": used,
-                        "capacity": capacity,
-                        "usage_ratio": if capacity > 0 { used as f64 / capacity as f64 } else { 0.0 }
+                        "used": total_used,
+                        "capacity": total_capacity,
+                        "usage_ratio": if total_capacity > 0 { total_used as f64 / total_capacity as f64 } else { 0.0 }
                     },
                     "buckets": buckets_data,
                     "pools": pool_metrics,

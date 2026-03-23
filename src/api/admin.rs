@@ -13,7 +13,6 @@ pub async fn get_health() -> impl IntoResponse {
 
 pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
     let pools: Vec<crate::storage::pool::StoragePool> = state.pool_manager.get_all_pools().await;
-    let (used, capacity) = state.pool_manager.get_total_usage().await;
 
     // Get buckets list
     let buckets = state.metadata.list_buckets().unwrap_or_default();
@@ -76,11 +75,19 @@ pub async fn get_metrics(State(state): State<S3AppState>) -> impl IntoResponse {
         })
         .collect();
 
+    // Calculate total storage from pool metrics (from database, not in-memory values)
+    let total_used: u64 = pool_metrics.iter()
+        .filter_map(|p| p["used"].as_u64())
+        .sum();
+    let total_capacity: u64 = pool_metrics.iter()
+        .filter_map(|p| p["capacity"].as_u64())
+        .sum();
+
     Json(serde_json::json!({
         "storage": {
-            "used": used,
-            "capacity": capacity,
-            "usage_ratio": if capacity > 0 { used as f64 / capacity as f64 } else { 0.0 }
+            "used": total_used,
+            "capacity": total_capacity,
+            "usage_ratio": if total_capacity > 0 { total_used as f64 / total_capacity as f64 } else { 0.0 }
         },
         "buckets": buckets_data,
         "pools": pool_metrics,
