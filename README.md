@@ -351,13 +351,12 @@ objstor/
 │
 ├── docker-compose.yml              # Standard Docker deployment
 ├── docker-compose.dev.yml          # Development environment
-├── docker-compose.storage.yml      # Multi-volume storage
 ├── Dockerfile                      # Container image
+├── Dockerfile.local                # Local build image
 ├── Makefile                        # Build automation
 │
 ├── docs/                # Documentation
 │   ├── CONFIGURATION.md  # Configuration guide
-│   ├── DOCKER.md         # Docker deployment guide
 │   └── POOL_CONFIG_GUIDE.md  # Pool configuration implementation
 │
 └── examples/            # Example configurations
@@ -636,9 +635,14 @@ Expected performance (on modern hardware):
 
 ## Documentation
 
+### User Guides
 - [BUILD.md](BUILD.md) - Build and setup guide
+- [DOCKER_DEPLOY.md](DOCKER_DEPLOY.md) - Docker deployment guide
+- [LOCAL_DEPLOYMENT.md](LOCAL_DEPLOYMENT.md) - Local deployment guide
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Project structure and architecture
+
+### Configuration
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md) - Configuration guide
-- [docs/DOCKER.md](docs/DOCKER.md) - Docker deployment
 - [docs/POOL_CONFIG_GUIDE.md](docs/POOL_CONFIG_GUIDE.md) - Pool configuration
 - [CLAUDE.md](CLAUDE.md) - Development guidelines
 
