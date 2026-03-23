@@ -1,0 +1,7 @@
+{
+  "id": "pool-001",
+  "capacity": 107374182400,
+  "used": 34,
+  "objects_count": 1,
+  "status": "Healthy"
+}

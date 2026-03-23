@@ -1,0 +1,41 @@
+# Local build Dockerfile - uses local Rust installation
+# This avoids pulling base images from Docker Hub
+
+FROM alpine:3.18
+
+# If you have connectivity issues, you can:
+# 1. Pull alpine:3.18 manually when network is stable
+# 2. Or use a different base image
+
+# Install runtime dependencies
+RUN apk add --no-cache \
+    sqlite-libs \
+    ca-certificates \
+    wget
+
+# Create app user
+RUN addgroup -g 1000 objstor && \
+    adduser -D -u 1000 -G objstor objstor
+
+# Set working directory
+WORKDIR /app
+
+# Copy the locally compiled binary
+COPY --chown=objstor:objstor target/release/objstor /app/objstor
+
+# Create directories
+RUN mkdir -p /app/data /app/logs /app/storage && \
+    chown -R objstor:objstor /app
+
+# Switch to non-root user
+USER objstor
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --spider -q http://localhost:8080/health || exit 1
+
+# Run the application
+CMD ["/app/objstor"]
