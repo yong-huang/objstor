@@ -288,12 +288,6 @@ h1 {
     border: none;
 }
 
-.btn-primary {
-    background-color: #4b5563;
-    color: white;
-}
-.btn-primary:hover { background-color: var(--text-main); }
-
 .btn-light {
     background-color: var(--primary-btn-light);
     color: var(--text-main);
