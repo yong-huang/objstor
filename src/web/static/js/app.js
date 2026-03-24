@@ -104,6 +104,9 @@ class ObjStorApp {
             case 'logs':
                 this.initLogs();
                 break;
+            case 'settings':
+                await this.loadSettings();
+                break;
         }
     }
 
@@ -150,6 +153,9 @@ class ObjStorApp {
                     if (this.currentPage === 'monitoring') {
                         this.updateMonitoringChart(data.data);
                     }
+                }
+                if (this.currentPage === 'settings') {
+                    this.updateSettingsPools(data.data);
                 }
                 break;
             case 'log':
@@ -572,6 +578,27 @@ class ObjStorApp {
         }
     }
 
+    calculateUptime() {
+        const uptime = Date.now() - this.startTime;
+        const seconds = Math.floor(uptime / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        let uptimeText = '';
+        if (days > 0) {
+            uptimeText = `${days}d ${hours % 24}h ${minutes % 60}m`;
+        } else if (hours > 0) {
+            uptimeText = `${hours}h ${minutes % 60}m`;
+        } else if (minutes > 0) {
+            uptimeText = `${minutes}m ${seconds % 60}s`;
+        } else {
+            uptimeText = `${seconds}s`;
+        }
+
+        return uptimeText;
+    }
+
     formatBytes(bytes) {
         if (bytes === 0) return '0 B';
         const k = 1024;
@@ -584,6 +611,90 @@ class ObjStorApp {
         const container = document.getElementById('logs-container');
         if (container) {
             container.innerHTML = '<div class="log-entry"><span class="log-timestamp">[System]</span> <span class="log-level-info">Connected to logs stream</span></div>';
+        }
+    }
+
+    async loadSettings() {
+        // Update system info
+        const uptimeElement = document.getElementById('settings-uptime');
+        const startedElement = document.getElementById('settings-started');
+
+        if (uptimeElement) {
+            const uptime = this.calculateUptime();
+            uptimeElement.textContent = uptime;
+        }
+
+        if (startedElement) {
+            const started = new Date(this.startTime).toLocaleString();
+            startedElement.textContent = started;
+        }
+
+        // Load storage pools configuration
+        await this.loadStoragePools();
+    }
+
+    updateSettingsPools(data) {
+        // Update storage pools display when receiving metrics
+        this.loadStoragePools();
+    }
+
+    async loadStoragePools() {
+        const container = document.getElementById('settings-pools');
+        if (!container) return;
+
+        try {
+            const response = await fetch('/api/v1/metrics');
+            if (!response.ok) throw new Error('Failed to fetch metrics');
+
+            const data = await response.json();
+            const pools = data.pools || [];
+
+            if (pools.length === 0) {
+                container.innerHTML = '<div class="text-gray text-center py-8">No storage pools configured</div>';
+                return;
+            }
+
+            container.innerHTML = pools.map(pool => {
+                const usagePercent = (pool.usage_ratio * 100).toFixed(2);
+                const usageClass = pool.usage_ratio < 0.5 ? 'low' : pool.usage_ratio < 0.8 ? 'medium' : 'high';
+                const statusClass = pool.status.toLowerCase();
+                const statusText = pool.status;
+
+                return `
+                    <div class="pool-config-card">
+                        <div class="pool-config-header">
+                            <div class="pool-config-title">${pool.id}</div>
+                            <div class="pool-config-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div class="pool-config-stats">
+                            <div class="pool-stat">
+                                <span class="pool-stat-label">Capacity</span>
+                                <span class="pool-stat-value">${this.formatBytes(pool.capacity)}</span>
+                            </div>
+                            <div class="pool-stat">
+                                <span class="pool-stat-label">Used</span>
+                                <span class="pool-stat-value">${this.formatBytes(pool.used)}</span>
+                            </div>
+                            <div class="pool-stat">
+                                <span class="pool-stat-label">Objects</span>
+                                <span class="pool-stat-value">${pool.objects.toLocaleString()}</span>
+                            </div>
+                            <div class="pool-stat">
+                                <span class="pool-stat-label">Usage</span>
+                                <span class="pool-stat-value">${usagePercent}%</span>
+                            </div>
+                        </div>
+                        <div class="pool-usage-bar">
+                            <div class="pool-usage-bar-bg">
+                                <div class="pool-usage-bar-fill ${usageClass}" style="width: ${usagePercent}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            container.innerHTML = '<div class="text-red text-center py-8">Failed to load storage pools</div>';
+            console.error('Failed to load storage pools:', error);
         }
     }
 
