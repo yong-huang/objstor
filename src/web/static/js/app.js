@@ -10,6 +10,7 @@ class ObjStorApp {
     async init() {
         this.setupTheme();
         this.setupNavigation();
+        this.setupConfigActions();
         this.connectWebSocket();
         await this.loadPage('dashboard');
         this.updateUptime();
@@ -65,6 +66,13 @@ class ObjStorApp {
                 }
             });
         });
+    }
+
+    setupConfigActions() {
+        const saveBtn = document.getElementById('save-config-btn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.saveConfiguration());
+        }
     }
 
     async loadPage(page) {
@@ -631,6 +639,96 @@ class ObjStorApp {
 
         // Load storage pools configuration
         await this.loadStoragePools();
+
+        // Load configuration
+        await this.loadConfiguration();
+    }
+
+    async loadConfiguration() {
+        try {
+            const response = await fetch('/api/v1/config');
+            if (!response.ok) throw new Error('Failed to load configuration');
+
+            const config = await response.json();
+
+            // Update server config fields
+            if (config.server) {
+                document.getElementById('config-server-host').value = config.server.host || '0.0.0.0';
+                document.getElementById('config-server-port').value = config.server.port || 8080;
+                document.getElementById('config-s3-port').value = config.server.s3_port || 8080;
+                document.getElementById('config-log-level').value = config.server.log_level || 'info';
+                document.getElementById('config-log-dir').value = config.server.log_dir || './logs';
+                document.getElementById('config-max-request-size').value = config.server.max_request_size || 5368709120;
+            }
+
+            // Update storage config fields
+            if (config.storage) {
+                document.getElementById('config-scheduler-strategy').value = config.storage.scheduler?.strategy || 'least_loaded';
+                document.getElementById('config-rebalance-threshold').value = config.storage.scheduler?.rebalance_threshold || 0.2;
+            }
+        } catch (error) {
+            console.error('Failed to load configuration:', error);
+            this.showToast('Failed to load configuration', 'error');
+        }
+    }
+
+    async saveConfiguration() {
+        const saveBtn = document.getElementById('save-config-btn');
+        const originalText = saveBtn.innerHTML;
+
+        try {
+            // Disable button and show loading
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem; margin-right: 0.5rem; animation: spin 1s linear infinite;">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/>
+                    <path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor"/>
+                </svg>
+                Saving...
+            `;
+
+            // Gather configuration data
+            const config = {
+                server: {
+                    host: document.getElementById('config-server-host').value,
+                    port: parseInt(document.getElementById('config-server-port').value),
+                    s3_port: parseInt(document.getElementById('config-s3-port').value),
+                    log_level: document.getElementById('config-log-level').value,
+                    log_dir: document.getElementById('config-log-dir').value,
+                    max_request_size: parseInt(document.getElementById('config-max-request-size').value),
+                },
+                storage: {
+                    scheduler: {
+                        strategy: document.getElementById('config-scheduler-strategy').value,
+                        rebalance_threshold: parseFloat(document.getElementById('config-rebalance-threshold').value),
+                    }
+                }
+            };
+
+            // Send update request
+            const response = await fetch('/api/v1/config', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                this.showToast(result.message || 'Configuration saved successfully!', 'success');
+            } else {
+                throw new Error(result.error || 'Failed to save configuration');
+            }
+        } catch (error) {
+            console.error('Failed to save configuration:', error);
+            this.showToast(error.message || 'Failed to save configuration', 'error');
+        } finally {
+            // Restore button
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
     }
 
     updateSettingsPools(data) {

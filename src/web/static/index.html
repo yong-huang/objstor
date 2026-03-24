@@ -292,19 +292,33 @@
                     <div class="card-body space-y-4">
                         <div>
                             <label class="block text-sm font-medium mb-2">Server Host</label>
-                            <div class="config-value">0.0.0.0</div>
+                            <input type="text" id="config-server-host" class="config-input" value="0.0.0.0">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-2">Server Port</label>
-                            <div class="config-value">8080</div>
+                            <input type="number" id="config-server-port" class="config-input" value="8080">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">S3 Port</label>
+                            <input type="number" id="config-s3-port" class="config-input" value="8080">
                         </div>
                         <div>
                             <label class="block text-sm font-medium mb-2">Log Level</label>
-                            <div class="config-value badge badge-info">info</div>
+                            <select id="config-log-level" class="config-input">
+                                <option value="error">Error</option>
+                                <option value="warn">Warn</option>
+                                <option value="info">Info</option>
+                                <option value="debug">Debug</option>
+                                <option value="trace">Trace</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2">Data Directory</label>
-                            <div class="config-value text-sm">./data</div>
+                            <label class="block text-sm font-medium mb-2">Log Directory</label>
+                            <input type="text" id="config-log-dir" class="config-input" value="./logs">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Max Request Size (bytes)</label>
+                            <input type="number" id="config-max-request-size" class="config-input" value="5368709120">
                         </div>
                     </div>
                 </div>
@@ -318,15 +332,32 @@
                     <div class="card-body space-y-4">
                         <div>
                             <label class="block text-sm font-medium mb-2">Strategy</label>
-                            <div class="config-value badge badge-success">least_loaded</div>
+                            <select id="config-scheduler-strategy" class="config-input">
+                                <option value="least_loaded">Least Loaded</option>
+                                <option value="weighted_round_robin">Weighted Round Robin</option>
+                                <option value="adaptive">Adaptive</option>
+                            </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2">Rebalance Threshold</label>
-                            <div class="config-value">0.2 (20%)</div>
+                            <label class="block text-sm font-medium mb-2">Rebalance Threshold (0-1)</label>
+                            <input type="number" id="config-rebalance-threshold" class="config-input" value="0.2" step="0.1" min="0" max="1">
                         </div>
-                        <div class="mt-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <div class="text-xs text-gray mb-1">Load Balancing Strategy</div>
                             <div class="text-sm">Automatically distributes objects across storage pools based on available capacity and current load.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div class="card">
+                    <div class="card-body">
+                        <button id="save-config-btn" class="btn-primary" style="width: 100%;">
+                            <svg viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem; margin-right: 0.5rem;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            Save Configuration
+                        </button>
+                        <div class="text-xs text-gray mt-2 text-center">
+                            ⚠️ Some changes may require service restart to take effect
                         </div>
                     </div>
                 </div>

@@ -85,6 +85,8 @@ async fn main() -> anyhow::Result<()> {
             "/api/v1/buckets",
             axum::routing::get(admin::get_buckets_api),
         )
+        .route("/api/v1/config", axum::routing::get(admin::get_config))
+        .route("/api/v1/config", axum::routing::put(admin::update_config))
         // WebSocket endpoint
         .route("/ws", axum::routing::get(websocket::websocket_handler))
         // Web UI routes (at /web)

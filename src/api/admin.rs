@@ -1,4 +1,5 @@
 use crate::api::s3::handler::S3AppState;
+use crate::config::Config;
 use axum::{
     extract::State,
     response::{IntoResponse, Json},
@@ -115,4 +116,100 @@ pub async fn get_buckets_api(State(state): State<S3AppState>) -> impl IntoRespon
     Json(serde_json::json!({
         "buckets": buckets_data
     }))
+}
+
+pub async fn get_config() -> impl IntoResponse {
+    match Config::from_file("data/config/objstor.json") {
+        Ok(config) => Json(serde_json::json!({
+            "server": {
+                "host": config.server.host,
+                "port": config.server.port,
+                "s3_port": config.server.s3_port,
+                "log_level": config.server.log_level,
+                "log_dir": config.server.log_dir.to_string_lossy().to_string(),
+                "max_request_size": config.server.max_request_size,
+            },
+            "storage": {
+                "data_dir": config.storage.data_dir.to_string_lossy().to_string(),
+                "scheduler": {
+                    "strategy": config.storage.scheduler.strategy,
+                    "rebalance_threshold": config.storage.scheduler.rebalance_threshold,
+                },
+            }
+        })),
+        Err(_) => {
+            Json(serde_json::json!({
+                "error": "Failed to load configuration"
+            }))
+        }
+    }
+}
+
+pub async fn update_config(
+    State(_state): State<S3AppState>,
+    Json(payload): Json<serde_json::Value>,
+) -> impl IntoResponse {
+    // Load current config
+    let mut config = match Config::from_file("data/config/objstor.json") {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            return Json(serde_json::json!({
+                "success": false,
+                "error": "Failed to load current configuration"
+            }))
+        }
+    };
+
+    // Update server config
+    if let Some(server) = payload.get("server") {
+        if let Some(host) = server.get("host").and_then(|v| v.as_str()) {
+            config.server.host = host.to_string();
+        }
+        if let Some(port) = server.get("port").and_then(|v| v.as_u64()) {
+            config.server.port = port as u16;
+        }
+        if let Some(s3_port) = server.get("s3_port").and_then(|v| v.as_u64()) {
+            config.server.s3_port = s3_port as u16;
+        }
+        if let Some(log_level) = server.get("log_level").and_then(|v| v.as_str()) {
+            config.server.log_level = log_level.to_string();
+        }
+        if let Some(log_dir) = server.get("log_dir").and_then(|v| v.as_str()) {
+            config.server.log_dir = log_dir.into();
+        }
+        if let Some(max_request_size) = server.get("max_request_size").and_then(|v| v.as_u64()) {
+            config.server.max_request_size = max_request_size as usize;
+        }
+    }
+
+    // Update storage config
+    if let Some(storage) = payload.get("storage") {
+        if let Some(data_dir) = storage.get("data_dir").and_then(|v| v.as_str()) {
+            config.storage.data_dir = data_dir.into();
+        }
+        if let Some(scheduler) = storage.get("scheduler") {
+            if let Some(strategy) = scheduler.get("strategy").and_then(|v| v.as_str()) {
+                config.storage.scheduler.strategy = strategy.to_string();
+            }
+            if let Some(threshold) = scheduler.get("rebalance_threshold").and_then(|v| v.as_f64()) {
+                config.storage.scheduler.rebalance_threshold = threshold;
+            }
+        }
+    }
+
+    // Save updated config
+    match config.save_to_default_path() {
+        Ok(_) => {
+            Json(serde_json::json!({
+                "success": true,
+                "message": "Configuration updated successfully. Please restart the service for changes to take effect."
+            }))
+        }
+        Err(e) => {
+            Json(serde_json::json!({
+                "success": false,
+                "error": format!("Failed to save configuration: {}", e)
+            }))
+        }
+    }
 }
