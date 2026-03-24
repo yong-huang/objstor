@@ -1,55 +1,55 @@
-# ObjStor Docker 部署指南
+# ObjStor Docker Deployment Guide
 
-## 快速部署
+## Quick Deployment
 
-### 1. 使用自动化脚本（推荐）
+### 1. Using Automated Script (Recommended)
 
 ```bash
-# 运行部署脚本
+# Run deployment script
 ./scripts/docker-deploy.sh
 ```
 
-脚本会自动完成：
-- ✓ 创建存储目录结构
-- ✓ 构建Docker镜像
-- ✓ 启动服务
-- ✓ 健康检查
+The script will automatically:
+- ✓ Create storage directory structure
+- ✓ Build Docker image
+- ✓ Start service
+- ✓ Health check
 
-### 2. 手动部署
+### 2. Manual Deployment
 
-#### 步骤 1: 创建存储目录
+#### Step 1: Create Storage Directories
 
 ```bash
-# 在宿主机创建存储目录
+# Create storage directories on host machine
 mkdir -p /Users/hyhit/Desktop/workspace/storage/pools/pool-001/{objects,metadata}
 mkdir -p /Users/hyhit/Desktop/workspace/storage/pools/pool-002/{objects,metadata}
 ```
 
-#### 步骤 2: 构建镜像
+#### Step 2: Build Image
 
 ```bash
 docker build -t objstor:latest .
 ```
 
-#### 步骤 3: 启动服务
+#### Step 3: Start Service
 
 ```bash
 docker compose up -d
 ```
 
-## 目录映射
+## Directory Mapping
 
-### 宿主机 → 容器内映射
+### Host → Container Mapping
 
-| 宿主机路径 | 容器内路径 | 说明 |
-|-----------|-----------|------|
-| `/Users/hyhit/Desktop/workspace/storage` | `/app/storage` | 存储池数据 |
-| `./data` | `/app/data` | 元数据和配置 |
-| `./logs` | `/app/logs` | 日志文件 |
+| Host Path | Container Path | Description |
+|-----------|----------------|-------------|
+| `/Users/hyhit/Desktop/workspace/storage` | `/app/storage` | Storage pool data |
+| `./data` | `/app/data` | Metadata and configuration |
+| `./logs` | `/app/logs` | Log files |
 
-### 配置文件中的路径
+### Paths in Configuration Files
 
-配置文件 `data/config/objstor.json` 中的路径使用**容器内路径**：
+Paths in the configuration file `data/config/objstor.json` use **container paths**:
 
 ```json
 {
@@ -57,7 +57,7 @@ docker compose up -d
     "pools": [
       {
         "id": "pool-001",
-        "path": "./storage/pools/pool-001",  // 容器内路径
+        "path": "./storage/pools/pool-001",  // Container path
         "capacity": 107374182400,
         "max_objects": 1000000
       }
@@ -66,91 +66,91 @@ docker compose up -d
 }
 ```
 
-## 服务访问
+## Service Access
 
-### Web界面和API
+### Web Interface and API
 
 - **S3 API**: http://localhost:8080
 - **Web UI**: http://localhost:8080/web
-- **健康检查**: http://localhost:8080/health
+- **Health Check**: http://localhost:8080/health
 - **Metrics**: http://localhost:8080/api/v1/metrics
 
-### 默认凭证
+### Default Credentials
 
 ```
 Access Key ID: test-access-key
 Secret Key: test-secret-key
 ```
 
-## 常用命令
+## Common Commands
 
-### 容器管理
+### Container Management
 
 ```bash
-# 查看日志
+# View logs
 docker logs -f objstor
 
-# 停止服务
+# Stop service
 docker compose down
 
-# 重启服务
+# Restart service
 docker compose restart
 
-# 进入容器
+# Enter container
 docker exec -it objstor sh
 
-# 查看容器状态
+# Check container status
 docker ps
 ```
 
-### 数据管理
+### Data Management
 
 ```bash
-# 查看存储目录内容
+# View storage directory contents
 ls -la /Users/hyhit/Desktop/workspace/storage/
 
-# 查看容器内存储映射
+# View container storage mapping
 docker exec objstor ls -la /app/storage/
 
-# 备份数据
+# Backup data
 tar -czf objstor-backup-$(date +%Y%m%d).tar.gz \
     /Users/hyhit/Desktop/workspace/storage/ \
     ./data/ \
     ./logs/
 ```
 
-## S3客户端测试
+## S3 Client Testing
 
-### 使用AWS CLI
+### Using AWS CLI
 
 ```bash
-# 配置别名
+# Configure alias
 alias s3='aws s3 --endpoint-url http://localhost:8080'
 
-# 列出buckets
+# List buckets
 s3 ls
 
-# 创建bucket
+# Create bucket
 s3 mb s3://test-bucket
 
-# 上传文件
+# Upload file
 echo "Hello ObjStor" > test.txt
 s3 cp test.txt s3://test-bucket/
 
-# 下载文件
+# Download file
 s3 cp s3://test-bucket/test.txt downloaded.txt
 
-# 删除文件
+# Delete file
 s3 rm s3://test-bucket/test.txt
 
-# 删除bucket
+# Delete bucket
 s3 rb s3://test-bucket
 ```
 
-### 使用rclone
+### Using rclone
 
 ```bash
-# 配置rclone
+# Configure rclone
 rclone config create objstor s3 \
     --provider "Other" \
     --access-key-id "test-access-key" \
@@ -158,128 +158,128 @@ rclone config create objstor s3 \
     --endpoint "http://localhost:8080" \
     --location "us-east-1"
 
-# 列出buckets
+# List buckets
 rclone lsd objstor:
 
-# 上传文件
+# Upload file
 rclone copy /path/to/files objstor:test-bucket/
 
-# 下载文件
+# Download file
 rclone copy objstor:test-bucket/ /path/to/download/
 ```
 
-## 监控和调试
+## Monitoring and Debugging
 
-### 查看实时日志
+### View Real-time Logs
 
 ```bash
-# 查看所有日志
+# View all logs
 docker logs -f objstor
 
-# 只看错误日志
+# View only error logs
 docker logs -f objstor 2>&1 | grep ERROR
 
-# 看最近100行
+# View last 100 lines
 docker logs --tail 100 objstor
 ```
 
-### 健康检查
+### Health Check
 
 ```bash
-# 使用curl
+# Using curl
 curl http://localhost:8080/health
 
-# 使用wget
+# Using wget
 wget -qO- http://localhost:8080/health
 
-# 查看metrics
+# View metrics
 curl http://localhost:8080/api/v1/metrics | jq
 ```
 
-### 性能监控
+### Performance Monitoring
 
-使用带监控的docker-compose配置：
+Use docker-compose configuration with monitoring:
 
 ```bash
-# 使用监控配置启动
+# Start with monitoring configuration
 docker compose -f docker-compose.dev.yml up -d
 
-# 访问Prometheus
+# Access Prometheus
 open http://localhost:9090
 
-# 访问Grafana (admin/admin)
+# Access Grafana (admin/admin)
 open http://localhost:3000
 ```
 
-## 故障排查
+## Troubleshooting
 
-### 问题1: 容器启动失败
+### Issue 1: Container Fails to Start
 
 ```bash
-# 查看详细日志
+# View detailed logs
 docker logs objstor
 
-# 检查目录权限
+# Check directory permissions
 ls -la /Users/hyhit/Desktop/workspace/storage/
 ls -la ./data/
 
-# 修复权限
+# Fix permissions
 chmod -R 755 /Users/hyhit/Desktop/workspace/storage/
 chmod -R 755 ./data/
 ```
 
-### 问题2: 无法访问服务
+### Issue 2: Unable to Access Service
 
 ```bash
-# 检查端口是否被占用
+# Check if port is occupied
 lsof -i :8080
 
-# 检查容器状态
+# Check container status
 docker ps -a
 
-# 检查网络
+# Check network
 docker network ls
 docker network inspect objstor_objstor_network
 ```
 
-### 问题3: 数据无法写入
+### Issue 3: Data Cannot Be Written
 
 ```bash
-# 检查存储目录权限
+# Check storage directory permissions
 docker exec objstor ls -la /app/storage/
 
-# 检查磁盘空间
+# Check disk space
 df -h /Users/hyhit/Desktop/workspace/storage/
 
-# 重新创建目录结构
+# Recreate directory structure
 rm -rf /Users/hyhit/Desktop/workspace/storage/*
 mkdir -p /Users/hyhit/Desktop/workspace/storage/pools/pool-001/{objects,metadata}
 ```
 
-### 问题4: 配置文件错误
+### Issue 4: Configuration File Error
 
 ```bash
-# 验证JSON格式
+# Validate JSON format
 cat data/config/objstor.json | jq
 
-# 重新生成默认配置
+# Regenerate default configuration
 rm data/config/objstor.json
 docker compose up -d
 ```
 
-## 高级配置
+## Advanced Configuration
 
-### 修改存储路径
+### Modify Storage Path
 
-编辑 `docker-compose.yml`:
+Edit `docker-compose.yml`:
 
 ```yaml
 volumes:
-  # 修改为你的路径
+  # Change to your path
   - /your/custom/path:/app/storage
 ```
 
-编辑 `data/config/objstor.json`:
+Edit `data/config/objstor.json`:
 
 ```json
 {
@@ -293,40 +293,40 @@ volumes:
 }
 ```
 
-### 添加更多存储池
+### Add More Storage Pools
 
 ```bash
-# 创建新池目录
+# Create new pool directory
 mkdir -p /Users/hyhit/Desktop/workspace/storage/pools/pool-003/{objects,metadata}
 
-# 更新配置文件
+# Update configuration file
 vim data/config/objstor.json
 
-# 重启服务
+# Restart service
 docker compose restart
 ```
 
-### 修改端口
+### Change Port
 
-编辑 `docker-compose.yml`:
+Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "9000:8080"  # 宿主机端口:容器端口
+  - "9000:8080"  # Host port:Container port
 ```
 
-### 启用调试日志
+### Enable Debug Logging
 
-编辑 `docker-compose.yml`:
+Edit `docker-compose.yml`:
 
 ```yaml
 environment:
-  - RUST_LOG=debug  # 改为debug级别
+  - RUST_LOG=debug  # Change to debug level
 ```
 
-## 备份和恢复
+## Backup and Restore
 
-### 备份
+### Backup
 
 ```bash
 #!/bin/bash
@@ -337,22 +337,22 @@ DATE=$(date +%Y%m%d_%H%M%S)
 
 mkdir -p $BACKUP_DIR
 
-# 停止服务（可选，确保数据一致性）
+# Stop service (optional, ensures data consistency)
 docker compose stop
 
-# 创建备份
+# Create backup
 tar -czf $BACKUP_DIR/objstor-$DATE.tar.gz \
     /Users/hyhit/Desktop/workspace/storage/ \
     ./data/ \
     ./logs/
 
-# 重启服务
+# Restart service
 docker compose start
 
-echo "备份完成: $BACKUP_DIR/objstor-$DATE.tar.gz"
+echo "Backup completed: $BACKUP_DIR/objstor-$DATE.tar.gz"
 ```
 
-### 恢复
+### Restore
 
 ```bash
 #!/bin/bash
@@ -361,51 +361,51 @@ echo "备份完成: $BACKUP_DIR/objstor-$DATE.tar.gz"
 BACKUP_FILE=$1
 
 if [ -z "$BACKUP_FILE" ]; then
-    echo "用法: ./restore.sh <备份文件>"
+    echo "Usage: ./restore.sh <backup_file>"
     exit 1
 fi
 
-# 停止服务
+# Stop service
 docker compose down
 
-# 解压备份
+# Extract backup
 tar -xzf $BACKUP_FILE -C /
 
-# 启动服务
+# Start service
 docker compose up -d
 
-echo "恢复完成"
+echo "Restore completed"
 ```
 
-## 升级
+## Upgrade
 
 ```bash
-# 1. 备份数据
+# 1. Backup data
 ./backup.sh
 
-# 2. 拉取新代码
+# 2. Pull new code
 git pull
 
-# 3. 重新构建镜像
+# 3. Rebuild image
 docker build -t objstor:latest .
 
-# 4. 重启服务
+# 4. Restart service
 docker compose up -d
 
-# 5. 验证服务
+# 5. Verify service
 curl http://localhost:8080/health
 ```
 
-## 卸载
+## Uninstall
 
 ```bash
-# 停止并删除容器
+# Stop and delete container
 docker compose down
 
-# 删除镜像
+# Delete image
 docker rmi objstor:latest
 
-# 删除数据（谨慎！）
+# Delete data (caution!)
 # rm -rf /Users/hyhit/Desktop/workspace/storage/
 # rm -rf ./data/
 # rm -rf ./logs/

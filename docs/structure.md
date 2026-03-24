@@ -1,321 +1,281 @@
-# ObjStor 项目结构
+# ObjStor Project Structure
 
-## 目录结构
+## Directory Structure
 
 ```
 objstor/
-├── src/                      # 源代码
-│   ├── main.rs              # 程序入口
-│   ├── lib.rs               # 库导出
-│   ├── api/                 # API 层
-│   │   ├── s3/             # S3 协议实现
-│   │   ├── admin.rs        # 管理 API
-│   │   └── middleware.rs   # 中间件
-│   ├── storage/             # 存储引擎
-│   │   ├── pool.rs         # 存储池
-│   │   ├── pool_manager.rs # 池管理器
-│   │   └── multipart.rs    # 分片上传
-│   ├── scheduler/           # 调度系统
-│   │   ├── load_balancer.rs # 负载均衡
-│   │   └── placement.rs     # 数据放置
-│   ├── metadata/            # 元数据存储
-│   ├── auth/               # 认证授权
-│   ├── logging/            # 日志系统
-│   ├── web/                # Web 界面
-│   └── config/             # 配置管理
+├── src/                      # Source code
+│   ├── main.rs              # Program entry point
+│   ├── lib.rs               # Library exports
+│   ├── api/                 # API layer
+│   │   ├── s3/             # S3 protocol implementation
+│   │   ├── admin.rs        # Admin API
+│   │   └── middleware.rs   # Middleware
+│   ├── storage/             # Storage engine
+│   │   ├── pool.rs         # Storage pool
+│   │   ├── pool_manager.rs # Pool manager
+│   │   └── multipart.rs    # Multipart upload
+│   ├── scheduler/           # Scheduler system
+│   │   ├── load_balancer.rs # Load balancing
+│   │   └── placement.rs     # Data placement
+│   ├── metadata/            # Metadata storage
+│   ├── auth/               # Authentication & authorization
+│   ├── logging/            # Logging system
+│   ├── web/                # Web interface
+│   └── config/             # Configuration management
 │
-├── tests/                   # 测试
-│   ├── integration_test.rs # 集成测试
-│   ├── api_test.rs        # API 测试
-│   └── cli_test.sh        # CLI 测试脚本
+├── tests/                   # Tests
+│   ├── integration_test.rs # Integration tests
+│   ├── api_test.rs        # API tests
+│   └── cli_test.sh        # CLI test scripts
 │
-├── scripts/                 # 工具脚本
-│   ├── benchmark.sh       # 性能测试
-│   ├── configure.sh       # 快速配置
-│   ├── docker-build.sh    # Docker 构建
-│   ├── docker-deploy.sh   # Docker 部署
-│   ├── docker-push.sh     # Docker 推送
-│   ├── init_config.sh     # 配置向导
-│   └── local-deploy.sh    # 本地部署
+├── scripts/                 # Utility scripts
+│   ├── benchmark.sh       # Performance tests
+│   ├── configure.sh       # Quick configuration
+│   ├── docker-build.sh    # Docker build
+│   ├── docker-deploy.sh   # Docker deployment
+│   ├── docker-push.sh     # Docker push
+│   ├── init_config.sh     # Configuration wizard
+│   └── local-deploy.sh    # Local deployment
 │
-├── examples/               # 示例配置
-│   ├── storage.example.json       # 存储配置示例
-│   ├── prometheus.yml             # Prometheus 配置
-│   ├── docker-compose-metrics.yml # 监控堆栈
-│   ├── grafana-datasources.yml    # Grafana 数据源
-│   └── alertmanager.yml           # 告警配置
+├── examples/               # Example configurations
+│   ├── storage.example.json       # Storage configuration example
+│   ├── prometheus.yml             # Prometheus configuration
+│   ├── docker-compose-metrics.yml # Monitoring stack
+│   ├── grafana-datasources.yml    # Grafana datasources
+│   └── alertmanager.yml           # Alert configuration
 │
-├── docs/                   # 文档
-│   ├── CONFIGURATION.md   # 配置说明
-│   └── POOL_CONFIG_GUIDE.md # Pool 配置指南
+├── docs/                   # Documentation
+│   ├── CONFIGURATION.md   # Configuration guide
+│   └── POOL_CONFIG_GUIDE.md # Pool configuration guide
 │
-├── data/                   # 运行时数据（gitignore）
-│   ├── config/           # 配置文件
-│   └── metadata.db       # 元数据数据库
+├── data/                   # Runtime data (gitignore)
+│   ├── config/           # Configuration files
+│   └── metadata.db       # Metadata database
 │
-├── logs/                   # 日志文件（gitignore）
+├── logs/                   # Log files (gitignore)
 │
-├── Dockerfile             # Docker 构建文件
-├── Dockerfile.local       # 本地构建 Dockerfile
-├── docker-compose.yml     # Docker Compose 配置
-├── docker-compose.dev.yml # 开发环境配置
+├── Dockerfile             # Docker build file
+├── Dockerfile.local       # Local build Dockerfile
+├── docker-compose.yml     # Docker Compose configuration
+├── docker-compose.dev.yml # Development environment configuration
+├── README.md              # Main project documentation
+├── BUILD.md               # Build instructions
+├── CLAUDE.md              # Claude project guide
+├── DOCKER_DEPLOY.md       # Docker deployment guide
+├── LOCAL_DEPLOYMENT.md    # Local deployment guide
+├── PROJECT_STRUCTURE.md   # This file
 │
-├── README.md              # 项目主文档
-├── BUILD.md               # 构建说明
-├── CLAUDE.md              # Claude 项目指南
-├── DOCKER_DEPLOY.md       # Docker 部署指南
-├── LOCAL_DEPLOYMENT.md    # 本地部署指南
-├── PROJECT_STRUCTURE.md   # 本文件
-│
-└── Cargo.toml             # Rust 项目配置
+└── Cargo.toml             # Rust project configuration
 ```
 
-## 核心模块说明
+## Core Module Overview
 
-### API 层 (src/api/)
-- **S3 协议**: 完整实现 S3 API
-- **认证**: AWS4-HMAC-SHA256 签名验证
-- **管理 API**: 健康检查、指标、bucket 管理
+### API Layer (`src/api/`)
+- **S3 Protocol**: Complete S3 API implementation
+- **Authentication**: AWS4-HMAC-SHA256 signature verification
+- **Admin API**: Health checks, metrics, bucket management
 
-### 存储层 (src/storage/)
-- **存储池**: 多池管理，独立容量配置
-- **对象存储**: 内容寻址存储（SHA256）
-- **分片上传**: 支持大文件分片上传
+### Storage Layer (`src/storage/`)
+- **Storage Pools**: Multi-pool management with individual capacity configs
+- **Object Storage**: Content-addressable storage (SHA256)
+- **Multipart Upload**: Support for large file chunked uploads
 
-### 调度系统 (src/scheduler/)
-- **负载均衡**: LeastLoaded、WeightedRoundRobin、Adaptive
-- **数据放置**: 智能选择存储池
-- **指标收集**: 实时性能监控
+### Scheduler System (`src/scheduler/`)
+- **Load Balancing**: LeastLoaded, WeightedRoundRobin, Adaptive
+- **Data Placement**: Intelligent storage pool selection
+- **Metrics Collection**: Real-time performance monitoring
 
-### 元数据 (src/metadata/)
-- **SQLite 存储**: Bucket、Object、用户信息
-- **索引优化**: 快速查询
-- **事务支持**: 数据一致性
+### Metadata (`src/metadata/`)
+- **SQLite Storage**: Buckets, Objects, user information
+- **Index Optimization**: Fast queries
+- **Transaction Support**: Data consistency
 
-### Web 界面 (src/web/)
-- **Dashboard**: 实时监控和统计
-- **Bucket 管理**: 创建、删除、浏览
-- **WebSocket**: 实时日志和指标推送
+### Web Interface (`src/web/`)
+- **Dashboard**: Real-time monitoring and statistics
+- **Bucket Management**: Create, delete, browse buckets
+- **WebSocket**: Real-time logs and metrics push
 
-## 部署方式
+## Deployment Methods
 
-### 1. 本地部署
+### 1. Local Deployment
+- Run compiled binary directly
+- No Docker required
+- Storage mapped to specified directory
+
+### 2. Docker Deployment
+- Containerized deployment
+- Requires Docker registry mirrors configuration
+- Supports data volume persistence
+
+## Configuration Files
+
+### Main Configuration
+**Location**: `data/config/objstor.json`
+
+**Structure**:
+- Server settings (host, port, TLS)
+- Storage configuration (data directory, pools)
+- Scheduler settings (strategy, thresholds)
+
+### Storage Configuration Example
+**Location**: `examples/storage.example.json`
+
+Contains various storage configuration scenarios:
+- Single storage pool
+- Multiple pools (SSD+HDD hybrid)
+- NFS network storage
+- Multi-disk independent mounts
+
+## Development Guide
+
+### Build Project
 ```bash
-./scripts/local-deploy.sh
-```
-- 直接运行编译的二进制
-- 无需 Docker
-- 存储映射到指定目录
-
-### 2. Docker 部署
-```bash
-./scripts/docker-deploy.sh
-```
-- 容器化部署
-- 需要配置 Docker registry mirrors
-- 支持数据卷持久化
-
-## 配置文件
-
-### 主配置文件
-**位置**: `data/config/objstor.json`
-
-**结构**:
-```json
-{
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "log_level": "info"
-  },
-  "storage": {
-    "data_dir": "./data",
-    "pools": [
-      {
-        "id": "pool-001",
-        "path": "/path/to/storage/pool-001",
-        "capacity": 107374182400,
-        "max_objects": 1000000
-      }
-    ],
-    "scheduler": {
-      "strategy": "least_loaded",
-      "rebalance_threshold": 0.2
-    }
-  }
-}
-```
-
-### 存储配置示例
-**位置**: `examples/storage.example.json`
-
-包含多种存储配置场景：
-- 单存储池
-- 多存储池（SSD+HDD 混合）
-- NFS 网络存储
-- 多磁盘独立挂载
-
-## 开发指南
-
-### 构建项目
-```bash
-# 开发版本
+# Development version
 cargo build
 
-# 发布版本
+# Release version
 cargo build --release
 
-# 运行测试
+# Run tests
 cargo test
 
-# 代码检查
+# Code linting
 cargo clippy
-cargo fmt
 ```
 
-### 添加新功能
-1. **S3 API**: 在 `src/api/s3/` 添加处理器
-2. **调度策略**: 在 `src/scheduler/load_balancer.rs` 添加算法
-3. **存储池**: 更新 `src/storage/pool.rs`
-4. **Web 页面**: 修改 `src/web/static/`
+### Add New Features
+1. **S3 API**: Add handlers in `src/api/s3/`
+2. **Scheduler Strategy**: Add algorithm in `src/scheduler/load_balancer.rs`
+3. **Storage Pool**: Update `src/storage/pool.rs`
+4. **Web Pages**: Modify `src/web/static/`
 
-### 测试
+### Testing
 ```bash
-# 单元测试
+# Unit tests
 cargo test
 
-# 集成测试
+# Integration tests
 cargo test --test integration_test
 
-# API 测试（需要运行服务）
-cargo test --test api_test -- --ignored
+# API tests (requires running service)
+./tests/api_test.sh
 
-# CLI 测试
+# CLI tests
 ./tests/cli_test.sh
 ```
 
-## 文档说明
+## Documentation Overview
 
-### 用户文档
-- **README.md**: 项目概述、快速开始
-- **BUILD.md**: 详细构建说明
-- **DOCKER_DEPLOY.md**: Docker 部署完整指南
-- **LOCAL_DEPLOYMENT.md**: 本地部署指南
+### User Documentation
+- **README.md**: Project overview, quick start
+- **BUILD.md**: Detailed build instructions
+- **DOCKER_DEPLOY.md**: Complete Docker deployment guide
+- **LOCAL_DEPLOYMENT.md**: Local deployment guide
 
-### 开发文档
-- **CLAUDE.md**: Claude AI 项目指南
-- **docs/CONFIGURATION.md**: 配置参数详解
-- **docs/POOL_CONFIG_GUIDE.md**: 存储池配置指南
+### Developer Documentation
+- **CLAUDE.md**: Claude AI project guide
+- **docs/CONFIGURATION.md**: Detailed configuration parameters
+- **docs/POOL_CONFIG_GUIDE.md**: Storage pool configuration guide
 
-### 示例配置
-- **examples/**: 各种场景的配置示例
-- **scripts/**: 自动化部署脚本
+### Example Configurations
+- **examples/**: Configuration examples for various scenarios
+- **scripts/**: Automated deployment scripts
 
-## 运行时目录
+## Runtime Directories
 
-### 数据目录 (data/)
-```
-data/
-├── config/
-│   └── objstor.json        # 主配置文件
-└── metadata.db              # 元数据数据库
-```
+### Data Directory (`data/`)
+- **config/**: Configuration files
+  - `objstor.json` - Main configuration file
+  - `storage.json` - Storage configuration
+- `metadata.db`: Metadata database
 
-### 日志目录 (logs/)
-```
-logs/
-├── objstor.log              # 主日志文件
-└── objstor.log.1            # 日志轮转文件
-```
+### Logs Directory (`logs/`)
+- `objstor.log`: Main log file
+- `objstor.log.1`, `objstor.log.2`, etc.: Log rotation files
 
-### 存储目录（外部）
-```
-/Users/hyhit/Desktop/workspace/storage/
-└── pools/
-    ├── pool-001/
-    │   ├── objects/         # 对象数据
-    │   │   └── [hash]/      # SHA256 哈希分片
-    │   │       ├── data      # 实际数据
-    │   │       └── meta.json # 元数据
-    │   └── metadata/
-    │       └── pool.json    # 池元数据
-    └── pool-002/
-        └── ...
-```
+### Storage Directory (External)
+- **pool-001/**, **pool-002/**, etc.: Storage pools
+  - **objects/**: Object data
+    - **[hash]/**: SHA256 hash shards
+      - **data**: Actual data
+      - **meta.json**: Metadata
+  - **metadata/**: Pool metadata
+    - **pool.json**: Pool metadata
 
-## 性能优化
+## Performance Optimization
 
-### 编译优化
+### Build Optimization
 ```bash
-# 使用发布配置
+# Use release configuration
 cargo build --release
 
-# 启用 LTO（链接时优化）
-RUSTFLAGS="-C link-arg=-fuse-ld=lld" cargo build --release
+# Enable LTO (Link-Time Optimization)
+# In Cargo.toml: lto = true
 ```
 
-### 运行时优化
-- 调整 `max_objects` 参数
-- 选择合适的调度策略
-- 使用多存储池分散负载
-- 启用日志轮转避免日志文件过大
+### Runtime Optimization
+- Adjust `max_objects` parameter
+- Choose appropriate scheduler strategy
+- Use multiple storage pools to distribute load
+- Enable log rotation to prevent overly large log files
 
-### 存储优化
-- 使用 SSD 存储 pool-001（热数据）
-- 使用 HDD 存储 pool-002（冷数据）
-- 定期清理未使用的对象
-- 监控存储使用率
+### Storage Optimization
+- Use SSD for pool-001 (hot data)
+- Use HDD for pool-002 (cold data)
+- Regularly clean unused objects
+- Monitor storage usage rate
 
-## 监控和告警
+## Monitoring and Alerting
 
-### Prometheus 指标
-- 请求速率
-- 存储使用率
-- 对象数量
-- 错误率
+### Prometheus Metrics
+- Request rate
+- Storage usage
+- Object count
+- Error rate
 
-### Grafana 仪表板
-使用 `examples/grafana-dashboards.yml` 配置
+### Grafana Dashboards
+Use `examples/grafana-dashboards.yml` for configuration
 
-### 告警规则
-使用 `examples/alerts/objstor.yml` 配置
+### Alert Rules
+Use `examples/alerts/objstor.yml` for configuration
 
-## 故障排查
+## Troubleshooting
 
-### 常见问题
-1. **端口占用**: 检查 8080 端口是否被占用
-2. **权限问题**: 确保存储目录有写权限
-3. **配置错误**: 验证 JSON 格式是否正确
-4. **数据库锁定**: SQLite 使用 WAL 模式
+### Common Issues
+1. **Port Conflict**: Check if port 8080 is occupied
+2. **Permission Issues**: Ensure storage directory has write permissions
+3. **Configuration Errors**: Verify JSON format is correct
+4. **Database Lock**: SQLite uses WAL mode
 
-### 日志级别
+### Log Levels
 ```bash
-# 调试模式
-RUST_LOG=debug ./target/release/objstor
+# Debug mode
+RUST_LOG=debug cargo run
 
-# 详细日志
-RUST_LOG=trace ./target/release/objstor
+# Verbose logging
+RUST_LOG=trace cargo run
 ```
 
-## 贡献指南
+## Contributing Guidelines
 
-1. Fork 项目
-2. 创建特性分支
-3. 提交变更
-4. 推送到分支
-5. 创建 Pull Request
+1. Fork the project
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-### 代码规范
-- 使用 `cargo fmt` 格式化代码
-- 通过 `cargo clippy` 检查
-- 编写单元测试
-- 更新相关文档
+### Code Standards
+- Format code with `cargo fmt`
+- Pass `cargo clippy` checks
+- Write unit tests
+- Update relevant documentation
 
-## 许可证
+## License
 
-MIT License
+MIT License - See LICENSE file for details
 
-## 联系方式
+## Contact
 
-- GitHub Issues: 报告问题
-- Discussions: 功能讨论
+- GitHub Issues: Report bugs
+- Discussions: Feature discussions

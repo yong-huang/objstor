@@ -1,10 +1,10 @@
-# ObjStor 配置指南
+# ObjStor Configuration Guide
 
-## 概述
+## Overview
 
-ObjStor使用JSON配置文件来管理服务器和存储池设置。配置文件位于 `data/config/objstor.json`。
+ObjStor uses JSON configuration files to manage server and storage pool settings. The configuration file is located at `data/config/objstor.json`.
 
-## 配置文件结构
+## Configuration File Structure
 
 ```json
 {
@@ -38,42 +38,42 @@ ObjStor使用JSON配置文件来管理服务器和存储池设置。配置文件
 }
 ```
 
-## 配置项说明
+## Configuration Parameters
 
-### Server 配置
+### Server Configuration
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `host` | string | "0.0.0.0" | 服务器监听地址 |
-| `port` | integer | 8080 | HTTP服务端口 |
-| `s3_port` | integer | 8080 | S3 API端口 |
-| `enable_tls` | boolean | false | 是否启用TLS |
-| `tls_cert` | string | "" | TLS证书路径 |
-| `tls_key` | string | "" | TLS私钥路径 |
-| `max_request_size` | integer | 5368709120 | 最大请求大小（字节） |
-| `log_level` | string | "info" | 日志级别：debug/info/warn/error |
-| `log_dir` | string | "./logs" | 日志目录 |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `host` | string | "0.0.0.0" | Server listening address |
+| `port` | integer | 8080 | HTTP service port |
+| `s3_port` | integer | 8080 | S3 API port |
+| `enable_tls` | boolean | false | Enable TLS |
+| `tls_cert` | string | "" | TLS certificate path |
+| `tls_key` | string | "" | TLS private key path |
+| `max_request_size` | integer | 5368709120 | Maximum request size (bytes) |
+| `log_level` | string | "info" | Log level: debug/info/warn/error |
+| `log_dir` | string | "./logs" | Log directory |
 
-### Storage 配置
+### Storage Configuration
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `data_dir` | string | "./data" | 数据根目录 |
-| `pools` | array | [] | 存储池配置数组 |
-| `scheduler.strategy` | string | "least_loaded" | 调度策略 |
-| `scheduler.rebalance_threshold` | float | 0.2 | 重平衡阈值 |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `data_dir` | string | "./data" | Data root directory |
+| `pools` | array | [] | Storage pool configuration array |
+| `scheduler.strategy` | string | "least_loaded" | Scheduler strategy |
+| `scheduler.rebalance_threshold` | float | 0.2 | Rebalance threshold |
 
-### Pool 配置
+### Pool Configuration
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `id` | string | 必填 | 存储池唯一标识 |
-| `path` | string | 必填 | 存储池路径（绝对或相对） |
-| `capacity` | integer | 107374182400 | 容量（字节） |
-| `max_objects` | integer | 1000000 | 最大对象数量 |
-| `quota_enabled` | boolean | false | 是否启用配额限制 |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `id` | string | Required | Unique pool identifier |
+| `path` | string | Required | Pool path (absolute or relative) |
+| `capacity` | integer | 107374182400 | Capacity (bytes) |
+| `max_objects` | integer | 1000000 | Maximum object count |
+| `quota_enabled` | boolean | false | Enable quota limit |
 
-## 容量计算
+## Capacity Calculation
 
 ```
 1 KB  = 1024 bytes
@@ -82,33 +82,33 @@ ObjStor使用JSON配置文件来管理服务器和存储池设置。配置文件
 1 TB  = 1024 GB  = 1,099,511,627,776 bytes
 ```
 
-示例：
+Examples:
 - 100 GB = 107,374,182,400 bytes
 - 500 GB = 536,870,912,000 bytes
 - 1 TB  = 1,099,511,627,776 bytes
 - 2 TB  = 2,199,023,255,552 bytes
 
-## 使用方法
+## Usage
 
-### 1. 使用默认配置
+### 1. Use Default Configuration
 
-首次运行时，如果配置文件不存在，会自动创建默认配置：
+On first run, if the configuration file doesn't exist, a default configuration will be automatically created:
 
 ```bash
 cargo run
 ```
 
-### 2. 使用交互式配置向导
+### 2. Use Interactive Configuration Wizard
 
-运行配置初始化脚本：
+Run the configuration initialization script:
 
 ```bash
 ./scripts/init_config.sh
 ```
 
-### 3. 手动编辑配置文件
+### 3. Manually Edit Configuration File
 
-编辑 `data/config/objstor.json`：
+Edit `data/config/objstor.json`:
 
 ```json
 {
@@ -129,9 +129,9 @@ cargo run
 }
 ```
 
-## 配置示例
+## Configuration Examples
 
-### 混合存储配置（SSD + HDD）
+### Hybrid Storage (SSD + HDD)
 
 ```json
 {
@@ -161,7 +161,7 @@ cargo run
 }
 ```
 
-### 多磁盘分布配置
+### Multi-Disk Distribution
 
 ```json
 {
@@ -198,7 +198,7 @@ cargo run
 }
 ```
 
-### 网络存储配置（NFS）
+### Network Storage (NFS)
 
 ```json
 {
@@ -228,88 +228,88 @@ cargo run
 }
 ```
 
-## 调度策略
+## Scheduler Strategies
 
-### least_loaded（默认）
+### least_loaded (Default)
 
-选择使用率最低的健康存储池。
+Selects the healthy storage pool with the lowest usage rate.
 
-**优点**：
-- 负载均衡效果好
-- 自动适应不同容量的pool
+**Advantages**:
+- Good load balancing effect
+- Automatically adapts to pools of different capacities
 
-**适用场景**：
-- Pool容量相近
-- 读写负载均衡
+**Use Cases**:
+- Similar pool capacities
+- Balanced read/write load
 
 ### weighted_round_robin
 
-按可用空间比例加权轮询。
+Weighted round-robin based on available space ratio.
 
-**优点**：
-- 考虑pool容量差异
-- 分配更均匀
+**Advantages**:
+- Considers pool capacity differences
+- More uniform distribution
 
-**适用场景**：
-- Pool容量差异大
-- 需要精确控制分配比例
+**Use Cases**:
+- Large differences in pool capacities
+- Need precise control over distribution ratio
 
 ### adaptive
 
-自适应调度，综合考虑负载、IOPS、网络带宽。
+Adaptive scheduling considering load, IOPS, and network bandwidth.
 
-**优点**：
-- 智能调度
-- 性能最优
+**Advantages**:
+- Intelligent scheduling
+- Optimal performance
 
-**适用场景**：
-- 复杂存储环境
-- 对性能要求高
+**Use Cases**:
+- Complex storage environments
+- High performance requirements
 
-## 故障排查
+## Troubleshooting
 
-### 配置文件未找到
+### Configuration File Not Found
 
 ```
 Error: Failed to load config: No such file or directory
 ```
 
-**解决方案**：
-1. 检查 `data/config/objstor.json` 是否存在
-2. 运行 `./scripts/init_config.sh` 创建配置
+**Solutions**:
+1. Check if `data/config/objstor.json` exists
+2. Run `./scripts/init_config.sh` to create configuration
 
-### Pool路径权限错误
+### Pool Path Permission Error
 
 ```
 Error: Failed to initialize directories: Permission denied
 ```
 
-**解决方案**：
-1. 检查pool路径的读写权限
-2. 确保运行用户有权限创建目录
+**Solutions**:
+1. Check read/write permissions for pool paths
+2. Ensure the running user has permission to create directories
 
-### Pool容量不足
+### Pool Capacity Insufficient
 
 ```
 Error: Storage pool 'pool-001' is full
 ```
 
-**解决方案**：
-1. 增加pool的capacity配置
-2. 添加新的pool
-3. 清理旧对象
+**Solutions**:
+1. Increase pool capacity configuration
+2. Add new pools
+3. Clean up old objects
 
-## 最佳实践
+## Best Practices
 
-1. **规划容量**：预留20-30%的冗余空间
-2. **使用独立磁盘**：每个pool使用独立的物理磁盘
-3. **监控使用率**：定期检查pool使用情况
-4. **定期备份**：重要数据配置多个pool
-5. **测试配置**：在生产环境前先测试配置
+1. **Capacity Planning**: Reserve 20-30% redundant space
+2. **Use Independent Disks**: Each pool should use an independent physical disk
+3. **Monitor Usage**: Regularly check pool usage
+4. **Regular Backups**: Configure multiple pools for important data
+5. **Test Configuration**: Test configuration before production deployment
 
-## 配置验证
+## Configuration Validation
 
-启动ObjStor时，会自动验证配置并显示：
+When ObjStor starts, it automatically validates the configuration and displays:
 
 ```
 INFO Loaded configuration from data/config/objstor.json
@@ -318,7 +318,7 @@ INFO   Pool: pool-001 - Path: "./data/pools/pool-001", Capacity: 100 GB, Max Obj
 INFO   Pool: pool-002 - Path: "./data/pools/pool-002", Capacity: 100 GB, Max Objects: 1000000
 ```
 
-## 相关文档
+## Related Documentation
 
-- [BUILD.md](../BUILD.md) - 构建和安装指南
-- [README.md](../README.md) - 项目概述
+- [BUILD.md](deployment/build.md) - Build and installation guide
+- [README.md](../README.md) - Project overview

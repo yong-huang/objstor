@@ -1,116 +1,116 @@
-# ObjStor 本地部署指南
+# ObjStor Local Deployment Guide
 
-## 部署状态
+## Deployment Status
 
-✅ **部署成功！** ObjStor 已成功部署并运行。
+✅ **Deployment Successful!** ObjStor has been successfully deployed and is running.
 
-### 服务信息
+### Service Information
 
-- **运行方式**: 本地运行（非Docker）
+- **Running Mode**: Local execution (non-Docker)
 - **S3 API**: http://localhost:8080
 - **Web UI**: http://localhost:8080/web
-- **健康检查**: http://localhost:8080/health
-- **存储目录**: `/Users/hyhit/Desktop/workspace/storage`
+- **Health Check**: http://localhost:8080/health
+- **Storage Directory**: `/Users/hyhit/Desktop/workspace/storage`
 
-### 存储配置
+### Storage Configuration
 
-存储池已映射到指定目录：
+Storage pools have been mapped to the specified directory:
 ```
 /Users/hyhit/Desktop/workspace/storage/
 └── pools/
     ├── pool-001/
-    │   ├── objects/     # 对象数据
-    │   └── metadata/    # 池元数据
+    │   ├── objects/     # Object data
+    │   └── metadata/    # Pool metadata
     └── pool-002/
         ├── objects/
         └── metadata/
 ```
 
-### 默认凭证
+### Default Credentials
 
 ```
 Access Key ID: test-access-key
 Secret Key: test-secret-key
 ```
 
-## 使用方法
+## Usage
 
-### 启动服务
+### Start Service
 
 ```bash
-# 前台运行
+# Foreground execution
 ./target/release/objstor
 
-# 后台运行
+# Background execution
 nohup ./target/release/objstor > logs/objstor.log 2>&1 &
 
-# 使用部署脚本
+# Use deployment script
 ./scripts/local-deploy.sh
 ```
 
-### 停止服务
+### Stop Service
 
 ```bash
-# 查找进程
+# Find process
 ps aux | grep objstor
 
-# 停止服务
+# Stop service
 pkill -f "objstor"
 ```
 
-### 查看日志
+### View Logs
 
 ```bash
-# 实时日志
+# Real-time logs
 tail -f logs/objstor.log
 
-# 最近100行
+# Last 100 lines
 tail -100 logs/objstor.log
 ```
 
-## S3 客户端使用
+## S3 Client Usage
 
-### 使用 AWS CLI
+### Using AWS CLI
 
 ```bash
-# 列出所有 buckets
+# List all buckets
 aws s3 ls --endpoint-url http://localhost:8080
 
-# 创建 bucket
+# Create bucket
 aws s3 mb s3://my-bucket --endpoint-url http://localhost:8080
 
-# 上传文件
+# Upload file
 aws s3 cp file.txt s3://my-bucket/ --endpoint-url http://localhost:8080
 
-# 下载文件
+# Download file
 aws s3 cp s3://my-bucket/file.txt ./downloaded.txt --endpoint-url http://localhost:8080
 
-# 列出 bucket 内容
+# List bucket contents
 aws s3 ls s3://my-bucket/ --endpoint-url http://localhost:8080
 
-# 删除文件
+# Delete file
 aws s3 rm s3://my-bucket/file.txt --endpoint-url http://localhost:8080
 
-# 删除 bucket
+# Delete bucket
 aws s3 rb s3://my-bucket --endpoint-url http://localhost:8080
 ```
 
-### 测试验证
+### Testing and Verification
 
 ```bash
-# 健康检查
+# Health check
 curl http://localhost:8080/health
 
-# 列出 buckets (XML格式)
+# List buckets (XML format)
 curl http://localhost:8080/
 
-# 查看指标
+# View metrics
 curl http://localhost:8080/api/v1/metrics | jq
 ```
 
-## 配置文件
+## Configuration File
 
-配置文件位置: `data/config/objstor.json`
+Configuration file location: `data/config/objstor.json`
 
 ```json
 {
@@ -133,72 +133,72 @@ curl http://localhost:8080/api/v1/metrics | jq
 }
 ```
 
-## 数据验证
+## Data Verification
 
-验证文件是否存储在映射目录：
+Verify files are stored in the mapped directory:
 
 ```bash
-# 查找存储的文件
+# Find stored files
 find /Users/hyhit/Desktop/workspace/storage/pools/ -type f -name "data"
 
-# 查看文件内容
+# View file contents
 cat /Users/hyhit/Desktop/workspace/storage/pools/pool-001/objects/*/data
 ```
 
-## 故障排查
+## Troubleshooting
 
-### 问题1: 端口已被占用
+### Issue 1: Port Already in Use
 
 ```bash
-# 查看端口占用
+# Check port usage
 lsof -i :8080
 
-# 停止占用端口的进程
+# Stop process occupying the port
 kill -9 <PID>
 ```
 
-### 问题2: 服务无法启动
+### Issue 2: Service Fails to Start
 
 ```bash
-# 查看详细日志
+# View detailed logs
 cat logs/objstor.log
 
-# 检查配置文件
+# Check configuration file
 cat data/config/objstor.json | jq
 ```
 
-### 问题3: 无法连接到服务
+### Issue 3: Unable to Connect to Service
 
 ```bash
-# 检查服务是否运行
+# Check if service is running
 ps aux | grep objstor
 
-# 测试端口
+# Test port
 telnet localhost 8080
 ```
 
-## 性能监控
+## Performance Monitoring
 
 ```bash
-# 查看进程资源使用
+# View process resource usage
 top -p $(pgrep objstor)
 
-# 查看存储使用情况
+# View storage usage
 du -sh /Users/hyhit/Desktop/workspace/storage/
 
-# 查看对象数量
+# View object count
 find /Users/hyhit/Desktop/workspace/storage/pools/ -type f -name "data" | wc -l
 ```
 
-## 下一步
+## Next Steps
 
-1. **配置认证**: 创建生产环境的 access keys
-2. **设置监控**: 配置 Prometheus + Grafana
-3. **备份策略**: 设置定期备份
-4. **性能调优**: 根据负载调整配置
+1. **Configure Authentication**: Create production access keys
+2. **Setup Monitoring**: Configure Prometheus + Grafana
+3. **Backup Strategy**: Set up regular backups
+4. **Performance Tuning**: Adjust configuration based on load
 
-## 相关文档
+## Related Documentation
 
-- [Docker 部署指南](DOCKER_DEPLOY.md)
-- [配置说明](docs/CONFIGURATION.md)
-- [API 文档](docs/API.md)
+- [Docker Deployment Guide](docker.md)
+- [Configuration Guide](../CONFIGURATION.md)
+- [API Documentation](../API.md)

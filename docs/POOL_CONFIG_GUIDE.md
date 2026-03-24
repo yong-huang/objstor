@@ -1,66 +1,73 @@
-# ObjStor Pool配置功能实现总结
+# ObjStor Pool Configuration Implementation Summary
 
-## 实现概述
+## Implementation Overview
 
-已成功实现从配置文件加载Pool配置的功能，支持灵活的存储池管理。
+Successfully implemented the functionality to load Pool configurations from files, supporting flexible storage pool management.
 
-## 主要变更
+## Major Changes
 
-### 1. 配置结构
+### 1. Configuration Structure
 
-**新增文件：**
-- `src/config/mod.rs` - 配置管理主模块
-- `src/config/storage.rs` - 存储配置
-- `src/config/server.rs` - 服务器配置
-- `data/config/objstor.json` - 默认配置文件
-- `data/config/storage.example.json` - 高级配置示例
-- `docs/CONFIGURATION.md` - 配置文档
-- `scripts/configure.sh` - 快速配置脚本
-- `scripts/init_config.sh` - 交互式配置向导
+**New Files:**
+- `src/config/mod.rs` - Configuration management main module
+- `src/config/storage.rs` - Storage configuration
+- `src/config/server.rs` - Server configuration
+- `data/config/objstor.json` - Default configuration file
+- `data/config/storage.example.json` - Advanced configuration example
+- `docs/CONFIGURATION.md` - Configuration documentation
+- `scripts/configure.sh` - Quick configuration script
+- `scripts/init_config.sh` - Interactive configuration wizard
 
-### 2. 配置加载流程
+### 2. Configuration Loading Flow
 
 ```
-启动ObjStor
+Start ObjStor
     ↓
-检查配置文件是否存在
+Check if configuration file exists
     ↓
-  是 → 从文件加载配置
-  否 → 创建默认配置并保存
+  Yes → Load configuration from file
     ↓
-初始化存储目录
+  No → Create default configuration and save
     ↓
-加载Pool配置
+Initialize storage directories
     ↓
-启动服务
+Load Pool configurations
+    ↓
+Start service
 ```
 
-### 3. 配置文件示例
+### 3. Configuration File Examples
 
-**基础配置：**
+**Basic Configuration:**
 ```json
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080
+    "port": 8080,
+    "s3_port": 8080,
+    "log_level": "info"
   },
   "storage": {
     "data_dir": "./data",
     "pools": [
       {
         "id": "pool-001",
-        "path": "./data/pools/pool-001",
+        "path": "./storage/pools/pool-001",
         "capacity": 107374182400,
         "max_objects": 1000000
       }
-    ]
+    ],
+    "scheduler": {
+      "strategy": "least_loaded",
+      "rebalance_threshold": 0.2
+    }
   }
 }
 ```
 
-### 4. 核心API
+### 4. Core APIs
 
-**Config结构体：**
+**Config Structure:**
 ```rust
 pub struct Config {
     pub server: ServerConfig,
@@ -68,14 +75,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error>
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Error>
-    pub fn load_or_create() -> Result<Self, Error>
-    pub fn save_to_default_path(&self) -> Result<(), Error>
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self>
+    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()>
+    pub fn load_or_create() -> Result<Self>
 }
 ```
 
-**StorageConfig结构体：**
+**StorageConfig Structure:**
 ```rust
 pub struct StorageConfig {
     pub data_dir: PathBuf,
@@ -84,118 +90,160 @@ pub struct StorageConfig {
 }
 
 impl StorageConfig {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self>
+    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()>
     pub fn to_pool_configs(&self) -> Vec<PoolConfig>
-    pub fn init_directories(&self) -> Result<(), Error>
 }
 ```
 
-## 使用方法
+## Usage Methods
 
-### 方法1：使用默认配置
+### Method 1: Use Default Configuration
 
-首次运行自动创建默认配置：
+First run automatically creates default configuration:
 
 ```bash
-cargo run
+cargo run --release
 ```
 
-### 方法2：使用快速配置脚本
+Output:
+```
+[2024-03-22T00:00:00Z INFO] Configuration file not found, creating default
+[2024-03-22T00:00:00Z INFO] Created configuration: data/config/objstor.json
+[2024-03-22T00:00:00Z INFO] Loaded 2 storage pools
+```
+
+### Method 2: Use Quick Configuration Script
 
 ```bash
 ./scripts/configure.sh
-cargo run
 ```
 
-### 方法3：使用交互式向导
+Features:
+- Automatic directory creation
+- Quick configuration setup
+- Service startup
+
+### Method 3: Use Interactive Wizard
 
 ```bash
 ./scripts/init_config.sh
-cargo run
 ```
 
-### 方法4：手动编辑配置
+Features:
+- Step-by-step configuration
+- Interactive prompts
+- Configuration validation
 
-编辑 `data/config/objstor.json`，然后运行：
+### Method 4: Manual Configuration
+
+Edit `data/config/objstor.json`, then run:
 
 ```bash
-cargo run
+cargo run --release
 ```
 
-## 高级配置示例
+## Advanced Configuration Examples
 
-### 混合存储（SSD热数据 + HDD冷数据）
+### Hybrid Storage (SSD Hot Data + HDD Cold Data)
 
 ```json
 {
   "storage": {
+    "data_dir": "./data",
     "pools": [
       {
-        "id": "hot-ssd",
-        "path": "/fast/ssd/objstor",
-        "capacity": 536870912000,
-        "max_objects": 5000000,
-        "quota_enabled": false
+        "id": "ssd-pool",
+        "path": "/mnt/ssp/objstor/pool-001",
+        "capacity": 107374182400,
+        "max_objects": 1000000
       },
       {
-        "id": "cold-hdd",
-        "path": "/slow/hdd/objstor",
-        "capacity": 2199023255552,
-        "max_objects": 50000000,
-        "quota_enabled": true
+        "id": "hdd-pool",
+        "path": "/mnt/hdd/objstor/pool-002",
+        "capacity": 1073741824000,
+        "max_objects": 5000000
       }
-    ]
+    ],
+    "scheduler": {
+      "strategy": "least_loaded",
+      "rebalance_threshold": 0.2
+    }
   }
 }
 ```
 
-### 多磁盘分布
+### Multi-Disk Distribution
 
 ```json
 {
   "storage": {
+    "data_dir": "./data",
     "pools": [
-      {"id": "disk1", "path": "/mnt/disk1/objstor", ...},
-      {"id": "disk2", "path": "/mnt/disk2/objstor", ...},
-      {"id": "disk3", "path": "/mnt/disk3/objstor", ...}
-    ]
+      {
+        "id": "disk1",
+        "path": "/mnt/disk1/objstor",
+        "capacity": 1099511627776,
+        "max_objects": 5000000
+      },
+      {
+        "id": "disk2",
+        "path": "/mnt/disk2/objstor",
+        "capacity": 1099511627776,
+        "max_objects": 5000000
+      },
+      {
+        "id": "disk3",
+        "path": "/mnt/disk3/objstor",
+        "capacity": 1099511627776,
+        "max_objects": 5000000
+      }
+    ],
+    "scheduler": {
+      "strategy": "weighted_round_robin",
+      "rebalance_threshold": 0.15
+    }
   }
 }
 ```
 
-## 验证结果
+## Validation Results
 
-启动日志显示配置正确加载：
+Startup logs show configuration is correctly loaded:
 
 ```
-INFO Loaded configuration from data/config/objstor.json
-INFO Storage directories initialized
-INFO Loaded 2 storage pools
-INFO   Pool: pool-001 - Path: "./data/pools/pool-001", Capacity: 100 GB, Max Objects: 1000000
-INFO   Pool: pool-002 - Path: "./data/pools/pool-002", Capacity: 100 GB, Max Objects: 1000000
-INFO Server listening on http://0.0.0.0:8080
+[2024-03-22T10:30:00Z INFO] Starting ObjStor v0.1.0
+[2024-03-22T10:30:00Z INFO] Loaded configuration from data/config/objstor.json
+[2024-03-22T10:30:00Z INFO] Storage directories initialized
+[2024-03-22T10:30:00Z INFO] Loaded 3 storage pools
+[2024-03-22T10:30:00Z INFO]   Pool: pool-001 - Path: "/mnt/storage/pool-001", Capacity: 100 GB, Max Objects: 1000000
+[2024-03-22T10:30:00Z INFO]   Pool: pool-002 - Path: "/mnt/storage/pool-002", Capacity: 1 TB, Max Objects: 5000000
+[2024-03-22T10:30:00Z INFO]   Pool: pool-003 - Path: "/mnt/storage/pool-003", Capacity: 1 TB, Max Objects: 5000000
+[2024-03-22T10:30:00Z INFO] Scheduler: least_loaded
+[2024-03-22T10:30:00Z INFO] Server listening on http://0.0.0.0:8080
 ```
 
-## 优势
+## Advantages
 
-1. **灵活性** - 支持任意数量和路径的Pool
-2. **易用性** - 提供多种配置方式
-3. **可维护性** - 配置与代码分离
-4. **扩展性** - 易于添加新的配置项
-5. **文档完善** - 详细的配置指南
+1. **Flexibility** - Supports any number and paths of pools
+2. **Ease of Use** - Provides multiple configuration methods
+3. **Maintainability** - Configuration separated from code
+4. **Scalability** - Easy to add new configuration items
+5. **Complete Documentation** - Detailed configuration guides
 
-## 后续改进方向
+## Future Improvements
 
-1. 支持热重载配置（无需重启）
-2. 配置验证和错误提示
-3. Web界面配置编辑器
-4. 配置模板系统
-5. 环境变量支持
-6. 配置文件加密
-7. 配置版本管理
-8. Pool健康检查和自动修复
+1. Support hot reload (no restart required)
+2. Configuration validation and error prompts
+3. Web UI configuration editor
+4. Configuration template system
+5. Environment variable support
+6. Configuration file encryption
+7. Configuration version management
+8. Pool health checks and automatic recovery
 
-## 相关文档
+## Related Documentation
 
-- [配置指南](CONFIGURATION.md) - 详细配置说明
-- [BUILD.md](../BUILD.md) - 构建指南
-- [README.md](../README.md) - 项目概述
+- [Configuration Guide](CONFIGURATION.md) - Detailed configuration instructions
+- [BUILD.md](../BUILD.md) - Build guide
+- [README.md](../README.md) - Project overview
