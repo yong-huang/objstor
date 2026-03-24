@@ -668,7 +668,7 @@ class ObjStorApp {
             }
         } catch (error) {
             console.error('Failed to load configuration:', error);
-            this.showToast('Failed to load configuration', 'error');
+            this.showToast('error', 'Error', 'Failed to load configuration');
         }
     }
 
@@ -717,13 +717,13 @@ class ObjStorApp {
             const result = await response.json();
 
             if (result.success) {
-                this.showToast(result.message || 'Configuration saved successfully!', 'success');
+                this.showToast('success', 'Success', result.message || 'Configuration saved successfully!');
             } else {
                 throw new Error(result.error || 'Failed to save configuration');
             }
         } catch (error) {
             console.error('Failed to save configuration:', error);
-            this.showToast(error.message || 'Failed to save configuration', 'error');
+            this.showToast('error', 'Error', error.message || 'Failed to save configuration');
         } finally {
             // Restore button
             saveBtn.disabled = false;
