@@ -636,15 +636,16 @@ Expected performance (on modern hardware):
 ## Documentation
 
 ### User Guides
-- [BUILD.md](BUILD.md) - Build and setup guide
-- [DOCKER_DEPLOY.md](DOCKER_DEPLOY.md) - Docker deployment guide
-- [LOCAL_DEPLOYMENT.md](LOCAL_DEPLOYMENT.md) - Local deployment guide
-- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Project structure and architecture
+- **[Deployment Guides](docs/README.md)**
+  - [Build Instructions](docs/deployment/build.md) - Build and setup guide
+  - [Docker Deployment](docs/deployment/docker.md) - Docker deployment guide
+  - [Local Deployment](docs/deployment/local.md) - Local deployment guide
+- **[Project Structure](docs/structure.md)** - Architecture and code organization
 
 ### Configuration
-- [docs/CONFIGURATION.md](docs/CONFIGURATION.md) - Configuration guide
-- [docs/POOL_CONFIG_GUIDE.md](docs/POOL_CONFIG_GUIDE.md) - Pool configuration
-- [CLAUDE.md](CLAUDE.md) - Development guidelines
+- **[Configuration Guide](docs/CONFIGURATION.md)** - Complete configuration reference
+- **[Pool Configuration](docs/POOL_CONFIG_GUIDE.md)** - Storage pool setup guide
+- **[Development Guidelines](CLAUDE.md)** - AI assistant development guide
 
 ## Troubleshooting
 
