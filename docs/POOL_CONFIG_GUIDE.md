@@ -245,5 +245,5 @@ Startup logs show configuration is correctly loaded:
 ## Related Documentation
 
 - [Configuration Guide](CONFIGURATION.md) - Detailed configuration instructions
-- [BUILD.md](../BUILD.md) - Build guide
+- [Build Guide](deployment/build.md) - Build guide
 - [README.md](../README.md) - Project overview

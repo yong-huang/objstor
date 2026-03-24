@@ -60,11 +60,12 @@ objstor/
 ├── docker-compose.yml     # Docker Compose configuration
 ├── docker-compose.dev.yml # Development environment configuration
 ├── README.md              # Main project documentation
-├── BUILD.md               # Build instructions
 ├── CLAUDE.md              # Claude project guide
-├── DOCKER_DEPLOY.md       # Docker deployment guide
-├── LOCAL_DEPLOYMENT.md    # Local deployment guide
-├── PROJECT_STRUCTURE.md   # This file
+├── Makefile              # Build scripts
+├── Dockerfile            # Docker build file
+├── Dockerfile.local      # Local build Dockerfile
+├── docker-compose.yml    # Docker Compose configuration
+├── docker-compose.dev.yml # Development environment configuration
 │
 └── Cargo.toml             # Rust project configuration
 ```
@@ -169,9 +170,9 @@ cargo test --test integration_test
 
 ### User Documentation
 - **README.md**: Project overview, quick start
-- **BUILD.md**: Detailed build instructions
-- **DOCKER_DEPLOY.md**: Complete Docker deployment guide
-- **LOCAL_DEPLOYMENT.md**: Local deployment guide
+- **docs/deployment/build.md**: Detailed build instructions
+- **docs/deployment/docker.md**: Complete Docker deployment guide
+- **docs/deployment/local.md**: Local deployment guide
 
 ### Developer Documentation
 - **CLAUDE.md**: Claude AI project guide
