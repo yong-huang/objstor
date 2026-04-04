@@ -108,18 +108,29 @@
                 </div>
             </div>
 
-            <!-- Charts Section -->
-            <div class="card">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
-                    STORAGE USAGE
+            <!-- Pool Usage + Storage Class Distribution -->
+            <div class="dashboard-charts-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                        POOL USAGE
+                    </div>
+                    <div class="card-body">
+                        <canvas id="pool-donut-chart" height="220"></canvas>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <canvas id="storage-chart" height="200"></canvas>
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
+                        STORAGE CLASS
+                    </div>
+                    <div class="card-body">
+                        <canvas id="storage-class-chart" height="220"></canvas>
+                    </div>
                 </div>
             </div>
 
-            <!-- Storage Pools -->
+            <!-- Storage Pools detail -->
             <div class="card">
                 <div class="card-header">
                     <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6" y2="6"/><line x1="6" y1="18" x2="6" y2="18"/></svg>
@@ -192,53 +203,100 @@
                 <p class="text-gray text-lg">Real-time system metrics and performance.</p>
             </div>
 
-            <!-- Summary Cards -->
-            <div class="summary-cards">
-                <div class="summary-card">
-                    <div class="summary-icon">
-                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    </div>
-                    <div class="summary-content">
-                        <div class="summary-label">Storage Usage</div>
-                        <div class="summary-value" id="monitor-storage">--%</div>
-                    </div>
+            <!-- System Resources Summary -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    SYSTEM RESOURCES
                 </div>
-                <div class="summary-card">
-                    <div class="summary-icon">
-                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </div>
-                    <div class="summary-content">
-                        <div class="summary-label">Total Objects</div>
-                        <div class="summary-value" id="monitor-objects">--</div>
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-icon">
-                        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/></svg>
-                    </div>
-                    <div class="summary-content">
-                        <div class="summary-label">Active Pools</div>
-                        <div class="summary-value" id="monitor-pools">--</div>
-                    </div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-icon">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    </div>
-                    <div class="summary-content">
-                        <div class="summary-label">Update Time</div>
-                        <div class="summary-value" id="monitor-time">--:--:--</div>
+                <div class="card-body">
+                    <div class="system-resources-grid">
+                        <!-- CPU -->
+                        <div class="resource-card">
+                            <div class="resource-card-header">
+                                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent-blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                                <span class="resource-label">CPU</span>
+                            </div>
+                            <div class="resource-value" id="sys-cpu-value">--</div>
+                            <div class="resource-bar"><div class="resource-bar-fill" id="sys-cpu-bar" style="width:0%"></div></div>
+                            <div class="resource-detail" id="sys-cpu-detail">-- cores</div>
+                        </div>
+                        <!-- Memory -->
+                        <div class="resource-card">
+                            <div class="resource-card-header">
+                                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent-green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="6" x2="6" y2="18"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                                <span class="resource-label">Memory</span>
+                            </div>
+                            <div class="resource-value" id="sys-mem-value">--</div>
+                            <div class="resource-bar"><div class="resource-bar-fill" id="sys-mem-bar" style="width:0%"></div></div>
+                            <div class="resource-detail" id="sys-mem-detail">-- / --</div>
+                        </div>
+                        <!-- Disk -->
+                        <div class="resource-card">
+                            <div class="resource-card-header">
+                                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--accent-yellow);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                                <span class="resource-label">Disk</span>
+                            </div>
+                            <div class="resource-value" id="sys-disk-value">--</div>
+                            <div class="resource-bar"><div class="resource-bar-fill" id="sys-disk-bar" style="width:0%"></div></div>
+                            <div class="resource-detail" id="sys-disk-detail">-- / --</div>
+                        </div>
+                        <!-- System Info -->
+                        <div class="resource-card">
+                            <div class="resource-card-header">
+                                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--text-secondary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                <span class="resource-label">System</span>
+                            </div>
+                            <div class="resource-info-list" id="sys-info-list">
+                                <div class="resource-info-row"><span>OS</span><span id="sys-os">--</span></div>
+                                <div class="resource-info-row"><span>Kernel</span><span id="sys-kernel">--</span></div>
+                                <div class="resource-info-row"><span>Uptime</span><span id="sys-uptime">--</span></div>
+                                <div class="resource-info-row"><span>Hostname</span><span id="sys-hostname">--</span></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    LIVE METRICS
+            <div class="dashboard-charts-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                        STORAGE USAGE TREND
+                    </div>
+                    <div class="card-body">
+                        <canvas id="storage-chart" height="200"></canvas>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <canvas id="metrics-chart" height="200"></canvas>
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        REQUESTS / MIN
+                    </div>
+                    <div class="card-body">
+                        <canvas id="requests-chart" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-charts-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        OBJECT COUNT TREND
+                    </div>
+                    <div class="card-body">
+                        <canvas id="object-trend-chart" height="200"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                        POOL OBJECTS
+                    </div>
+                    <div class="card-body">
+                        <canvas id="pool-objects-chart" height="200"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
@@ -270,149 +328,144 @@
                 <p class="text-gray text-lg">Manage system configuration and preferences.</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Storage Configuration -->
-                <div class="card">
-                    <div class="card-header">
-                        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        STORAGE POOLS
-                    </div>
-                    <div class="card-body">
-                        <div id="settings-pools" class="space-y-3">
-                            <div class="text-gray text-center py-8">Loading pools...</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="settings-layout">
 
-                <!-- Server Configuration -->
-                <div class="card">
-                    <div class="card-header">
-                        <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
-                        SERVER CONFIG
-                    </div>
-                    <div class="card-body space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Server Host</label>
-                            <input type="text" id="config-server-host" class="config-input" value="0.0.0.0">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Server Port</label>
-                            <input type="number" id="config-server-port" class="config-input" value="8080">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">S3 Port</label>
-                            <input type="number" id="config-s3-port" class="config-input" value="8080">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Log Level</label>
-                            <select id="config-log-level" class="config-input">
-                                <option value="error">Error</option>
-                                <option value="warn">Warn</option>
-                                <option value="info">Info</option>
-                                <option value="debug">Debug</option>
-                                <option value="trace">Trace</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Log Directory</label>
-                            <input type="text" id="config-log-dir" class="config-input" value="./logs">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Max Request Size (bytes)</label>
-                            <input type="number" id="config-max-request-size" class="config-input" value="5368709120">
-                        </div>
-                    </div>
-                </div>
+                <!-- Left Column: Server + Scheduler -->
+                <div class="settings-left">
 
-                <!-- Scheduler Configuration -->
-                <div class="card">
-                    <div class="card-header">
-                        <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-                        SCHEDULER
-                    </div>
-                    <div class="card-body space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Strategy</label>
-                            <select id="config-scheduler-strategy" class="config-input">
-                                <option value="least_loaded">Least Loaded</option>
-                                <option value="weighted_round_robin">Weighted Round Robin</option>
-                                <option value="adaptive">Adaptive</option>
-                            </select>
+                    <!-- Server Configuration -->
+                    <div class="card">
+                        <div class="card-header">
+                            <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+                            SERVER CONFIG
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-2">Rebalance Threshold (0-1)</label>
-                            <input type="number" id="config-rebalance-threshold" class="config-input" value="0.2" step="0.1" min="0" max="1">
-                        </div>
-                        <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <div class="text-xs text-gray mb-1">Load Balancing Strategy</div>
-                            <div class="text-sm">Automatically distributes objects across storage pools based on available capacity and current load.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Save Button -->
-                <div class="card">
-                    <div class="card-body">
-                        <button id="save-config-btn" class="btn-primary" style="width: 100%;">
-                            <svg viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem; margin-right: 0.5rem;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                            Save Configuration
-                        </button>
-                        <div class="text-xs text-gray mt-2 text-center">
-                            ⚠️ Some changes may require service restart to take effect
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Access Keys -->
-                <div class="card">
-                    <div class="card-header">
-                        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        ACCESS KEYS
-                    </div>
-                    <div class="card-body space-y-4">
-                        <div class="p-3 border border-gray-200 rounded-lg">
-                            <div class="text-sm font-medium mb-2">Default Access Key</div>
-                            <div class="space-y-2">
+                        <div class="card-body">
+                            <div class="settings-form-grid">
                                 <div>
-                                    <label class="text-xs text-gray">Access Key ID</label>
-                                    <div class="config-value text-sm font-mono">test-access-key</div>
+                                    <label class="block text-sm font-medium mb-2">Server Host</label>
+                                    <input type="text" id="config-server-host" class="config-input" value="0.0.0.0">
                                 </div>
                                 <div>
-                                    <label class="text-xs text-gray">Secret Access Key</label>
-                                    <div class="config-value text-sm font-mono">test-secret-key</div>
+                                    <label class="block text-sm font-medium mb-2">Server Port</label>
+                                    <input type="number" id="config-server-port" class="config-input" value="8080">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">S3 Port</label>
+                                    <input type="number" id="config-s3-port" class="config-input" value="8080">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Log Level</label>
+                                    <select id="config-log-level" class="config-input">
+                                        <option value="error">Error</option>
+                                        <option value="warn">Warn</option>
+                                        <option value="info" selected>Info</option>
+                                        <option value="debug">Debug</option>
+                                        <option value="trace">Trace</option>
+                                    </select>
+                                </div>
+                                <div class="span-2">
+                                    <label class="block text-sm font-medium mb-2">Log Directory</label>
+                                    <input type="text" id="config-log-dir" class="config-input" value="./logs">
+                                </div>
+                                <div class="span-2">
+                                    <label class="block text-sm font-medium mb-2">Max Request Size (bytes)</label>
+                                    <input type="number" id="config-max-request-size" class="config-input" value="5368709120">
                                 </div>
                             </div>
                         </div>
-                        <div class="text-xs text-gray">
-                            ⚠️ Default keys are for testing only. Change them in production.
+                    </div>
+
+                    <!-- Scheduler Configuration -->
+                    <div class="card mt-6">
+                        <div class="card-header">
+                            <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                            SCHEDULER
+                        </div>
+                        <div class="card-body">
+                            <div class="settings-form-grid">
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Strategy</label>
+                                    <select id="config-scheduler-strategy" class="config-input">
+                                        <option value="least_loaded">Least Loaded</option>
+                                        <option value="weighted_round_robin">Weighted Round Robin</option>
+                                        <option value="adaptive">Adaptive</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-2">Rebalance Threshold</label>
+                                    <input type="number" id="config-rebalance-threshold" class="config-input" value="0.2" step="0.1" min="0" max="1">
+                                </div>
+                                <div class="span-2">
+                                    <div class="settings-info-box">
+                                        <div class="text-xs text-gray mb-1">Load Balancing Strategy</div>
+                                        <div class="text-sm">Automatically distributes objects across storage pools based on available capacity and current load.</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
                 </div>
 
-                <!-- System Information -->
-                <div class="card">
-                    <div class="card-header">
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                        SYSTEM INFO
+                <!-- Right Column: System Info + Keys -->
+                <div class="settings-right">
+
+                    <!-- System Information -->
+                    <div class="card">
+                        <div class="card-header">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                            SYSTEM INFO
+                        </div>
+                        <div class="card-body">
+                            <div class="settings-info-list">
+                                <div class="settings-info-row">
+                                    <span class="text-sm text-gray">Version</span>
+                                    <span class="text-sm font-medium">v0.1.0</span>
+                                </div>
+                                <div class="settings-info-row">
+                                    <span class="text-sm text-gray">Build</span>
+                                    <span class="text-sm font-medium">Release</span>
+                                </div>
+                                <div class="settings-info-row">
+                                    <span class="text-sm text-gray">Uptime</span>
+                                    <span class="text-sm font-medium" id="settings-uptime">--:--:--</span>
+                                </div>
+                                <div class="settings-info-row">
+                                    <span class="text-sm text-gray">Started</span>
+                                    <span class="text-sm font-medium" id="settings-started">--</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body space-y-3">
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray">Version</span>
-                            <span class="text-sm font-medium">v0.1.0</span>
+
+                    <!-- Access Keys -->
+                    <div class="card mt-6">
+                        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                            <div style="display:flex;align-items:center;gap:0.5rem;">
+                                <svg viewBox="0 0 24 24" style="width:1.1rem;height:1.1rem;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                ACCESS KEYS
+                            </div>
+                            <button id="add-access-key-btn" class="btn-secondary" style="padding:0.35rem 0.75rem;font-size:0.75rem;">+ Add Key</button>
                         </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray">Build</span>
-                            <span class="text-sm font-medium">Release</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray">Uptime</span>
-                            <span class="text-sm font-medium" id="settings-uptime">--:--:--</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-sm text-gray">Started</span>
-                            <span class="text-sm font-medium" id="settings-started">--</span>
+                        <div class="card-body">
+                            <div id="access-keys-list">
+                                <div class="text-gray text-center py-4">Loading...</div>
+                            </div>
                         </div>
                     </div>
+
+                </div>
+
+            </div>
+
+            <!-- Save Button — full width at page bottom -->
+            <div class="settings-save-area">
+                <button id="save-config-btn" class="btn-primary settings-save-btn">
+                    <svg viewBox="0 0 24 24" style="width: 1.25rem; height: 1.25rem; margin-right: 0.5rem;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save Configuration
+                </button>
+                <div class="text-xs text-gray mt-2 text-center">
+                    Some changes may require service restart to take effect.
                 </div>
             </div>
         </div>

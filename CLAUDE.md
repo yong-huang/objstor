@@ -1,100 +1,104 @@
-# ObjStor - Project Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-ObjStor is an S3-compatible object storage simulator built with Rust. It provides a complete S3 API implementation, intelligent load balancing, and a modern web management interface.
+ObjStor is an S3-compatible object storage simulator written in Rust. It provides a full S3 API, multi-pool distributed storage with intelligent load balancing, and a web management dashboard.
 
-## Key Technical Details
-
-### Tech Stack
-- **Language**: Rust 1.70+
-- **Web Framework**: Axum 0.7
-- **Database**: SQLite (rusqlite)
-- **Authentication**: AWS4-HMAC-SHA256 signatures
-- **Real-time**: WebSocket
-- **Frontend**: Vanilla JavaScript + Chart.js
-
-### File Organization
-
-#### Core Modules
-- `src/main.rs` - Entry point, server setup
-- `src/lib.rs` - Library exports
-- `src/error.rs` - Error types and conversions
-
-#### Storage Layer (`src/storage/`)
-- `pool.rs` - Individual storage pool implementation
-- `pool_manager.rs` - Multi-pool coordination
-- `object.rs` - Object read/write operations
-- `multipart.rs` - Multipart upload handling
-- `layout.rs` - Storage directory structure
-
-#### Scheduler (`src/scheduler/`)
-- `load_balancer.rs` - Scheduling strategies (LeastLoaded, WeightedRoundRobin, Adaptive)
-- `metrics.rs` - Performance metrics collection
-- `placement.rs` - Data placement strategies
-
-#### Metadata (`src/metadata/`)
-- `db.rs` - SQLite schema and connection
-- `bucket.rs` - Bucket metadata operations
-- `object.rs` - Object metadata operations
-- `user.rs` - Access key management
-
-#### API Layer (`src/api/`)
-- `s3/handler.rs` - Main S3 request router
-- `s3/bucket.rs` - Bucket operations (Create, Delete, List)
-- `s3/object.rs` - Object operations (Put, Get, Delete, List)
-- `s3/multipart.rs` - Multipart upload operations
-- `admin.rs` - Admin API for metrics
-
-#### Web UI (`src/web/`)
-- `server.rs` - Web server routes
-- `websocket.rs` - Real-time WebSocket updates
-- `static/` - HTML/CSS/JS frontend
-
-### Important Design Decisions
-
-1. **Storage Pool Architecture**: Objects are stored in hash-based directories within pools, enabling efficient distribution
-2. **Load Balancing**: Multiple strategies available (LeastLoaded is default)
-3. **Metadata Separation**: SQLite stores metadata separately from data for faster queries
-4. **Real-time Updates**: WebSocket pushes metrics every 5 seconds
-
-### Testing Access Keys
-
-Default test credentials (created on first run):
-- Access Key ID: `test-access-key`
-- Secret Key: `test-secret-key`
-
-### Development Commands
+## Development Commands
 
 ```bash
-# Build
+# Build (debug)
 cargo build
 
-# Run
+# Build (release)
+cargo build --release
+
+# Run server (default port 8080)
 cargo run
 
 # Run with debug logging
 RUST_LOG=debug cargo run
 
-# Run tests
+# Run module-specific logs
+RUST_LOG=objstor::api=debug,objstor::storage=trace cargo run
+
+# Run all tests
 cargo test
 
-# Run with Clippy
-cargo clippy
+# Run a single test
+cargo test test_bucket_creation
+
+# Run tests with output
+cargo test -- --nocapture
 
 # Format code
 cargo fmt
+
+# Check formatting
+cargo fmt --check
+
+# Lint
+cargo clippy
+
+# Full check (fmt + clippy + test)
+make check
+
+# Docker
+make docker-compose-up
 ```
 
-### Common Issues
+## Architecture
 
-1. **Port already in use**: Change ports in `src/main.rs`
-2. **Permission errors**: Ensure write access to `./data` directory
-3. **Database locked**: SQLite uses WAL mode, but only one process should access at a time
+### Request Flow
 
-### Adding New Features
+Axum receives HTTP requests in `main.rs`. Admin/health/WebSocket routes are matched explicitly; everything else falls through to the S3 handler via `.fallback(s3_handler_wrap)`. The `S3Handler` in `src/api/s3/handler.rs` dispatches based on HTTP method and URI path segments (bucket vs bucket+key).
 
-1. **New S3 API**: Add handler in `src/api/s3/`, update router in `handler.rs`
-2. **New scheduling strategy**: Add to `src/scheduler/load_balancer.rs`
-3. **New metrics**: Add to `src/scheduler/metrics.rs`, update WebSocket messages
-4. **Web UI pages**: Add to `src/web/static/index.html`, handle in `src/web/static/js/app.js`
+### Shared State (`S3AppState`)
+
+Three `Arc`-wrapped pieces of state are shared across all handlers:
+- **`MetadataStore`** (`src/metadata/db.rs`) — SQLite connection (WAL mode, wrapped in `Arc<Mutex<Connection>>`). Schema is auto-created on first run. Stores buckets, objects, multipart uploads, upload parts, and access keys.
+- **`PoolManager`** (`src/storage/pool_manager.rs`) — Coordinates multiple `StoragePool` instances. Uses a `LoadBalancer` to select pools based on the configured `SchedulingStrategy` (LeastLoaded, WeightedRoundRobin, Adaptive, ConsistentHash).
+- **`MultipartUploadManager`** (`src/storage/multipart.rs`) — In-memory (wrapped in `tokio::sync::Mutex`), tracks active multipart uploads.
+
+### Storage Layout
+
+Objects are content-addressable: data is SHA256-hashed, stored under `data/pools/{pool-id}/objects/{hash[0:2]}/{hash}/data`, with per-object `meta.json`. Each pool tracks used space and object count in `metadata/pool.json`.
+
+### Key Modules
+
+- `src/config/` — JSON config (`data/config/objstor.json`). Auto-created with defaults on first run.
+- `src/error.rs` — Unified `Error` enum that maps to S3 error codes and HTTP status via `IntoResponse`.
+- `src/api/s3/auth.rs` — AWS4 signature detection only; full verification is stubbed.
+- `src/scheduler/` — Pool selection strategies. `LoadBalancer` selects pools based on health, capacity, and I/O metrics.
+- `src/web/` — Dashboard UI served as static files from `src/web/static/`. WebSocket at `/ws` pushes metrics every 5s.
+- `src/logging/` — tracing-based logging with daily rotation.
+
+### Database Schema
+
+SQLite at `data/metadata.db` with tables: `buckets`, `objects` (with versioning via `version_id`), `multipart_uploads`, `upload_parts`, `access_keys`. Objects are unique on `(bucket, key, version_id)`.
+
+## Configuration
+
+Config file: `data/config/objstor.json`. Created with defaults on first run. Key settings:
+- Server port (default 8080)
+- Storage data directory (default `./data`)
+- Pool definitions (id, path, capacity, max_objects, quota_enabled)
+- Scheduler strategy (default `least_loaded`)
+
+## Testing with S3 Clients
+
+Default credentials: `test-access-key` / `test-secret-key`, region `us-east-1`.
+
+```bash
+export AWS_ACCESS_KEY_ID=test-access-key
+export AWS_SECRET_ACCESS_KEY=test-secret-key
+aws s3 ls --endpoint-url http://localhost:8080
+```
+
+## Common Issues
+
+- **Port in use**: Kill process on 8080 or change port in config
+- **Database locked**: Only one process should access `data/metadata.db` at a time (WAL mode)
+- **Permission errors**: Ensure write access to `./data` directory

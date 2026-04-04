@@ -1,4 +1,5 @@
 use crate::storage::pool::PoolConfig;
+use crate::storage::tier::StorageTier;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +22,8 @@ pub struct StoragePoolConfig {
     pub max_objects: u64,
     #[serde(default)]
     pub quota_enabled: bool,
+    #[serde(default = "default_pool_tier")]
+    pub tier: String,
 }
 
 fn default_pool_capacity() -> u64 {
@@ -29,6 +32,10 @@ fn default_pool_capacity() -> u64 {
 
 fn default_max_objects() -> u64 {
     1_000_000
+}
+
+fn default_pool_tier() -> String {
+    "hot".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +74,7 @@ impl Default for StorageConfig {
                     capacity: 100 * 1024 * 1024 * 1024, // 100GB
                     max_objects: 1_000_000,
                     quota_enabled: false,
+                    tier: "hot".to_string(),
                 },
                 StoragePoolConfig {
                     id: "pool-002".to_string(),
@@ -74,6 +82,7 @@ impl Default for StorageConfig {
                     capacity: 100 * 1024 * 1024 * 1024, // 100GB
                     max_objects: 1_000_000,
                     quota_enabled: false,
+                    tier: "warm".to_string(),
                 },
             ],
             scheduler: SchedulerConfig::default(),
@@ -111,6 +120,7 @@ impl StorageConfig {
                 capacity: pool_config.capacity,
                 max_objects: pool_config.max_objects,
                 quota_enabled: pool_config.quota_enabled,
+                tier: StorageTier::from_str_lower(&pool_config.tier),
             })
             .collect()
     }

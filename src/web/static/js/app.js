@@ -5,6 +5,14 @@ class ObjStorApp {
         this.charts = {};
         this.startTime = Date.now();
         this.currentTheme = localStorage.getItem('theme') || 'light';
+        // Data history for trend charts
+        this.history = {
+            objectCounts: [],
+            requestTimestamps: [],
+            storageUsed: [],
+            poolObjects: {},
+        };
+        this.systemMetricsInterval = null;
     }
 
     async init() {
@@ -73,6 +81,11 @@ class ObjStorApp {
         if (saveBtn) {
             saveBtn.addEventListener('click', () => this.saveConfiguration());
         }
+
+        const addKeyBtn = document.getElementById('add-access-key-btn');
+        if (addKeyBtn) {
+            addKeyBtn.addEventListener('click', () => this.showAccessKeyModal());
+        }
     }
 
     async loadPage(page) {
@@ -94,6 +107,12 @@ class ObjStorApp {
         }
 
         this.currentPage = page;
+
+        // Clean up system metrics polling when leaving monitoring page
+        if (page !== 'monitoring' && this.systemMetricsInterval) {
+            clearInterval(this.systemMetricsInterval);
+            this.systemMetricsInterval = null;
+        }
 
         // Load page-specific data
         switch(page) {
@@ -156,14 +175,11 @@ class ObjStorApp {
                 if (this.currentPage === 'dashboard' || this.currentPage === 'monitoring') {
                     this.updateMetrics(data.data);
                     if (this.currentPage === 'dashboard') {
-                        this.updateStorageChart(data.data);
+                        this.updateDashboardCharts(data.data);
                     }
                     if (this.currentPage === 'monitoring') {
-                        this.updateMonitoringChart(data.data);
+                        this.updateMonitoringCharts(data.data);
                     }
-                }
-                if (this.currentPage === 'settings') {
-                    this.updateSettingsPools(data.data);
                 }
                 break;
             case 'log':
@@ -171,9 +187,59 @@ class ObjStorApp {
                     this.appendLog(data.data);
                 }
                 break;
+            case 'event':
+                this.handleEvent(data);
+                break;
             default:
                 console.log('Unknown message type:', data.type);
         }
+    }
+
+    handleEvent(data) {
+        if (!data.event || !data.data) return;
+        const eventName = data.event;
+        const eventData = data.data;
+        let title = '';
+        let message = '';
+        let toastType = 'info';
+
+        switch (eventName) {
+            case 'ObjectCreated':
+                title = 'Object Created';
+                message = `${eventData.bucket}/${eventData.key} (${this.formatBytes(eventData.size || 0)})`;
+                toastType = 'success';
+                break;
+            case 'ObjectDeleted':
+                title = 'Object Deleted';
+                message = `${eventData.bucket}/${eventData.key}`;
+                toastType = 'warning';
+                break;
+            case 'BucketCreated':
+                title = 'Bucket Created';
+                message = eventData.bucket;
+                toastType = 'success';
+                break;
+            case 'BucketDeleted':
+                title = 'Bucket Deleted';
+                message = eventData.bucket;
+                toastType = 'warning';
+                break;
+            case 'IntegrityCheck':
+                title = 'Integrity Check';
+                if (eventData.mismatches > 0) {
+                    message = `${eventData.mismatches} mismatches found`;
+                    toastType = 'error';
+                } else {
+                    message = `All ${eventData.checked} objects verified OK`;
+                    toastType = 'success';
+                }
+                break;
+            default:
+                title = eventName;
+                message = JSON.stringify(eventData);
+        }
+
+        this.showToast(toastType, title, message, 4000);
     }
 
     async loadDashboard() {
@@ -181,7 +247,9 @@ class ObjStorApp {
             const response = await fetch('/api/v1/metrics');
             const data = await response.json();
             this.updateMetrics(data);
-            this.initStorageChart(data);
+            this.updateDashboardSummary(data);
+            this.initPoolDonut(data);
+            this.initStorageClassChart();
         } catch (error) {
             console.error('Failed to load dashboard:', error);
         }
@@ -190,27 +258,45 @@ class ObjStorApp {
     updateMetrics(data) {
         if (!data) return;
 
-        console.log('updateMetrics received:', data);
+        // Record history
+        const now = Date.now();
+        this.history.storageUsed.push((data.storage?.used || 0) / (1024 * 1024 * 1024));
+        this.history.objectCounts.push(data.total_objects || 0);
+        this.history.requestTimestamps.push(now);
+        if (data.pools) {
+            data.pools.forEach(p => {
+                if (!this.history.poolObjects[p.id]) this.history.poolObjects[p.id] = [];
+                this.history.poolObjects[p.id].push(p.objects || 0);
+            });
+        }
+        // Keep last 60 data points
+        const maxLen = 60;
+        if (this.history.storageUsed.length > maxLen) this.history.storageUsed.shift();
+        if (this.history.objectCounts.length > maxLen) this.history.objectCounts.shift();
+        if (this.history.requestTimestamps.length > maxLen) this.history.requestTimestamps.shift();
+        Object.values(this.history.poolObjects).forEach(arr => {
+            while (arr.length > maxLen) arr.shift();
+        });
+    }
 
-        // Update summary cards
+    updateDashboardSummary(data) {
+        if (!data) return;
         const storage = data.storage || {};
         const used = this.formatBytes(storage.used || 0);
         const capacity = this.formatBytes(storage.capacity || 0);
 
-        document.getElementById('total-storage').textContent = `${used} / ${capacity}`;
+        const storageEl = document.getElementById('total-storage');
+        if (storageEl) storageEl.textContent = `${used} / ${capacity}`;
 
         const bucketCount = data.buckets?.length || 0;
-        console.log('Bucket count:', bucketCount, data.buckets);
-        document.getElementById('bucket-count').textContent = bucketCount;
+        const bucketEl = document.getElementById('bucket-count');
+        if (bucketEl) bucketEl.textContent = bucketCount;
 
-        // Use total_objects from database instead of summing pool objects
         const objectCount = data.total_objects || 0;
-        console.log('Total object count from DB:', objectCount);
-        document.getElementById('object-count').textContent = objectCount.toLocaleString();
+        const objEl = document.getElementById('object-count');
+        if (objEl) objEl.textContent = objectCount.toLocaleString();
 
-        // Update pools list
-        const pools = data.pools || [];
-        this.updatePoolsList(pools);
+        this.updatePoolsList(data.pools || []);
     }
 
     updatePoolsList(pools) {
@@ -242,69 +328,162 @@ class ObjStorApp {
         }).join('');
     }
 
-    initStorageChart(metricsData) {
-        const ctx = document.getElementById('storage-chart');
+    updateDashboardCharts(metricsData) {
+        this.updateDashboardSummary(metricsData);
+        this.updatePoolDonut(metricsData);
+        this.updateStorageClassChart();
+    }
+
+    initPoolDonut(metricsData) {
+        const ctx = document.getElementById('pool-donut-chart');
         if (!ctx) return;
+        if (this.charts.poolDonut) this.charts.poolDonut.destroy();
 
-        if (this.charts.storage) {
-            this.charts.storage.destroy();
-        }
+        const pools = metricsData?.pools || [];
+        if (pools.length === 0) return;
 
-        const storageUsedGB = (metricsData?.storage?.used || 0) / (1024 * 1024 * 1024);
-        const now = new Date().toLocaleTimeString();
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-        this.charts.storage = new Chart(ctx, {
-            type: 'line',
+        this.charts.poolDonut = new Chart(ctx, {
+            type: 'doughnut',
             data: {
-                labels: [now],
+                labels: pools.map(p => p.id),
                 datasets: [{
-                    label: 'Storage Usage (GB)',
-                    data: [storageUsedGB.toFixed(2)],
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.4
+                    data: pools.map(p => ((p.used || 0) / (1024 * 1024)).toFixed(2)),
+                    backgroundColor: colors.slice(0, pools.length),
+                    borderWidth: 0,
+                    hoverOffset: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Size (GB)'
-                        }
-                    }
-                },
+                cutout: '65%',
                 plugins: {
-                    legend: {
-                        display: false
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.parsed} MB`
+                        }
                     }
                 }
             }
         });
     }
 
-    updateStorageChart(metricsData) {
-        if (!this.charts.storage) return;
+    initStorageClassChart() {
+        const ctx = document.getElementById('storage-class-chart');
+        if (!ctx) return;
+        if (this.charts.storageClass) this.charts.storageClass.destroy();
 
-        const chart = this.charts.storage;
-        const storageUsedGB = (metricsData?.storage?.used || 0) / (1024 * 1024 * 1024);
-        const now = new Date().toLocaleTimeString();
+        this.charts.storageClass = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0,
+                    hoverOffset: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.parsed}`
+                        }
+                    }
+                }
+            }
+        });
+    }
 
-        // Add new data point
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push(storageUsedGB.toFixed(2));
-
-        // Keep only last 20 data points
-        if (chart.data.labels.length > 20) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
+    updateMonitoringCharts(metricsData) {
+        // Storage usage trend
+        if (this.charts.storage) {
+            const chart = this.charts.storage;
+            const idx = this.history.storageUsed.length - 1;
+            chart.data.labels.push(idx);
+            chart.data.datasets[0].data.push((this.history.storageUsed[idx] || 0).toFixed(2));
+            if (chart.data.labels.length > 30) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
+            chart.update('none');
         }
 
+        // Requests per minute
+        this.updateRequestsChart();
+
+        // Object count trend
+        if (this.charts.objectTrend) {
+            const trend = this.charts.objectTrend;
+            const now = new Date().toLocaleTimeString();
+            trend.data.labels.push(now);
+            trend.data.datasets[0].data.push(metricsData.total_objects || 0);
+            if (trend.data.labels.length > 30) { trend.data.labels.shift(); trend.data.datasets[0].data.shift(); }
+            trend.update('none');
+        }
+
+        // Pool objects bar
+        if (this.charts.poolObjects && metricsData.pools) {
+            const poolChart = this.charts.poolObjects;
+            poolChart.data.labels = metricsData.pools.map(p => p.id || 'unknown');
+            poolChart.data.datasets[0].data = metricsData.pools.map(p => p.objects || 0);
+            poolChart.data.datasets[1].data = metricsData.pools.map(p =>
+                ((p.used || 0) / (1024 * 1024)).toFixed(2)
+            );
+            poolChart.update('none');
+        }
+    }
+
+    updateRequestsChart() {
+        if (!this.charts.requests) return;
+        const chart = this.charts.requests;
+        const now = Date.now();
+        const oneMinAgo = now - 60000;
+        const recent = this.history.requestTimestamps.filter(t => t > oneMinAgo);
+        // Bucket into 10-second windows
+        const buckets = {};
+        recent.forEach(t => {
+            const slot = Math.floor(t / 10000) * 10;
+            buckets[slot] = (buckets[slot] || 0) + 1;
+        });
+        const labels = Object.keys(buckets).map(k => {
+            const mins = Math.floor((parseInt(k) * 10) / 60);
+            const secs = (parseInt(k) * 10) % 60;
+            return `${mins}m${secs < 10 ? '0' : ''}${secs}s`;
+        });
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = Object.values(buckets);
         chart.update('none');
+    }
+
+    updatePoolDonut(metricsData) {
+        if (!this.charts.poolDonut) return;
+        const pools = metricsData?.pools || [];
+        if (pools.length === 0) return;
+        this.charts.poolDonut.data.datasets[0].data = pools.map(p => ((p.used || 0) / (1024 * 1024)).toFixed(2));
+        this.charts.poolDonut.update('none');
+    }
+
+    updateStorageClassChart() {
+        if (!this.charts.storageClass) return;
+        // Count objects per storage class from pool data (aggregate from all pools)
+        const classMap = {};
+        (this.charts.poolDonut?.data?.labels || []).forEach(id => id);
+        // Use buckets data to get storage class counts from DB — for now estimate from pool tiers
+        const pools = this.charts.poolDonut?.data?.labels || [];
+        const tierClassMap = { hot: 'STANDARD', warm: 'STANDARD_IA', cold: 'GLACIER' };
+        pools.forEach(id => { classMap[tierClassMap[id] || id] = (classMap[tierClassMap[id] || id] || 0) + 1; });
+        const labels = Object.keys(classMap);
+        const data = Object.values(classMap);
+        if (labels.length === 0) return;
+        this.charts.storageClass.data.labels = labels;
+        this.charts.storageClass.data.datasets[0].data = data;
+        this.charts.storageClass.update('none');
     }
 
     async loadBuckets() {
@@ -469,96 +648,229 @@ class ObjStorApp {
         `;
     }
 
-    async loadMonitoring() {
-        const ctx = document.getElementById('metrics-chart');
-        if (!ctx) return;
-
-        if (this.charts.metrics) {
-            this.charts.metrics.destroy();
+    formatBytes(bytes) {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        let size = bytes;
+        while (size >= 1024 && i < units.length - 1) {
+            size /= 1024;
+            i++;
         }
+        return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    }
 
-        this.charts.metrics = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Storage Usage (%)',
-                    data: [],
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                }
-            }
-        });
+    formatUptime(secs) {
+        const days = Math.floor(secs / 86400);
+        const hours = Math.floor((secs % 86400) / 3600);
+        const mins = Math.floor((secs % 3600) / 60);
+        if (days > 0) return `${days}d ${hours}h`;
+        if (hours > 0) return `${hours}h ${mins}m`;
+        return `${mins}m`;
+    }
 
-        // Load initial metrics
-        try {
-            const response = await fetch('/api/v1/metrics');
-            const data = await response.json();
-            this.updateMonitoringChart(data);
-        } catch (error) {
-            console.error('Failed to load monitoring data:', error);
+    setBarThreshold(barEl, percent) {
+        barEl.classList.remove('warn', 'critical');
+        if (percent >= 85) {
+            barEl.classList.add('critical');
+        } else if (percent >= 60) {
+            barEl.classList.add('warn');
         }
     }
 
-    updateMonitoringChart(metricsData) {
-        if (!this.charts.metrics) return;
+    async loadSystemMetrics() {
+        try {
+            const res = await fetch('/api/v1/system');
+            const data = await res.json();
+            const cpu = data.cpu || {};
+            const mem = data.memory || {};
+            const disk = data.disk || {};
+            const sys = data.system || {};
 
-        const chart = this.charts.metrics;
-        const now = new Date().toLocaleTimeString();
+            // CPU
+            const cpuEl = document.getElementById('sys-cpu-value');
+            if (cpuEl) cpuEl.textContent = (cpu.usage_percent || 0).toFixed(1) + '%';
+            const cpuBar = document.getElementById('sys-cpu-bar');
+            if (cpuBar) {
+                cpuBar.style.width = (cpu.usage_percent || 0) + '%';
+                this.setBarThreshold(cpuBar, cpu.usage_percent || 0);
+            }
+            const cpuDetail = document.getElementById('sys-cpu-detail');
+            if (cpuDetail) cpuDetail.textContent = `${cpu.brand || '--'} / ${cpu.cores || '--'} cores`;
 
-        // Add new data point
-        chart.data.labels.push(now);
-        chart.data.datasets[0].data.push((metricsData.storage?.usage_ratio * 100).toFixed(2));
+            // Memory
+            const memEl = document.getElementById('sys-mem-value');
+            if (memEl) memEl.textContent = (mem.percent || 0).toFixed(1) + '%';
+            const memBar = document.getElementById('sys-mem-bar');
+            if (memBar) {
+                memBar.style.width = (mem.percent || 0) + '%';
+                this.setBarThreshold(memBar, mem.percent || 0);
+            }
+            const memDetail = document.getElementById('sys-mem-detail');
+            if (memDetail) memDetail.textContent = `${this.formatBytes(mem.used || 0)} / ${this.formatBytes(mem.total || 0)}`;
 
-        // Keep only last 20 data points
-        if (chart.data.labels.length > 20) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
+            // Disk
+            const diskEl = document.getElementById('sys-disk-value');
+            if (diskEl) diskEl.textContent = (disk.percent || 0).toFixed(1) + '%';
+            const diskBar = document.getElementById('sys-disk-bar');
+            if (diskBar) {
+                diskBar.style.width = (disk.percent || 0) + '%';
+                this.setBarThreshold(diskBar, disk.percent || 0);
+            }
+            const diskDetail = document.getElementById('sys-disk-detail');
+            if (diskDetail) diskDetail.textContent = `${this.formatBytes(disk.used || 0)} / ${this.formatBytes(disk.total || 0)}`;
+
+            // System info
+            const osEl = document.getElementById('sys-os');
+            if (osEl) osEl.textContent = sys.os || '--';
+            const kernelEl = document.getElementById('sys-kernel');
+            if (kernelEl) kernelEl.textContent = sys.kernel || '--';
+            const uptimeEl = document.getElementById('sys-uptime');
+            if (uptimeEl) uptimeEl.textContent = this.formatUptime(sys.uptime_secs || 0);
+            const hostnameEl = document.getElementById('sys-hostname');
+            if (hostnameEl) hostnameEl.textContent = sys.hostname || '--';
+        } catch (error) {
+            console.error('Failed to load system metrics:', error);
+        }
+    }
+
+    async loadMonitoring() {
+        // Load system resource metrics
+        await this.loadSystemMetrics();
+        // Poll every 5 seconds
+        if (this.systemMetricsInterval) clearInterval(this.systemMetricsInterval);
+        this.systemMetricsInterval = setInterval(() => this.loadSystemMetrics(), 5000);
+
+        // Storage Usage Trend
+        const storageCtx = document.getElementById('storage-chart');
+        if (storageCtx) {
+            if (this.charts.storage) this.charts.storage.destroy();
+            this.charts.storage = new Chart(storageCtx, {
+                type: 'line',
+                data: {
+                    labels: this.history.storageUsed.map((_, i) => i),
+                    datasets: [{
+                        label: 'Storage Used (GB)',
+                        data: [...this.history.storageUsed.map(v => v.toFixed(2))],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: false },
+                        y: { beginAtZero: true, title: { display: true, text: 'GB' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
 
-        chart.update('none'); // Update without animation for performance
-
-        // Update summary cards
-        const storageEl = document.getElementById('monitor-storage');
-        const objectsEl = document.getElementById('monitor-objects');
-        const poolsEl = document.getElementById('monitor-pools');
-        const timeEl = document.getElementById('monitor-time');
-
-        if (storageEl) {
-            const usageRatio = (metricsData.storage?.usage_ratio * 100 || 0).toFixed(1);
-            storageEl.textContent = `${usageRatio}%`;
+        // Requests per minute
+        const reqCtx = document.getElementById('requests-chart');
+        if (reqCtx) {
+            if (this.charts.requests) this.charts.requests.destroy();
+            this.charts.requests = new Chart(reqCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Requests',
+                        data: [],
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 0,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: false },
+                        y: { beginAtZero: true, title: { display: true, text: 'Requests' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
         }
 
-        if (objectsEl) {
-            const totalObjects = metricsData.total_objects || 0;
-            objectsEl.textContent = totalObjects.toLocaleString();
+        // Object Count Trend
+        const trendCtx = document.getElementById('object-trend-chart');
+        if (trendCtx) {
+            if (this.charts.objectTrend) this.charts.objectTrend.destroy();
+            this.charts.objectTrend = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Total Objects',
+                        data: [],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: true } }
+                }
+            });
         }
 
-        if (poolsEl) {
-            const activePools = metricsData.pools?.filter(p => p.status === 'Healthy').length || 0;
-            const totalPools = metricsData.pools?.length || 0;
-            poolsEl.textContent = `${activePools}/${totalPools}`;
+        // Pool Objects bar chart
+        const poolCtx = document.getElementById('pool-objects-chart');
+        if (poolCtx) {
+            if (this.charts.poolObjects) this.charts.poolObjects.destroy();
+            this.charts.poolObjects = new Chart(poolCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'Objects',
+                            data: [],
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: '#3b82f6',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Used (MB)',
+                            data: [],
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: '#10b981',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: true } }
+                }
+            });
         }
 
-        if (timeEl) {
-            timeEl.textContent = now;
+        // Load initial data
+        try {
+            const response = await fetch('/api/v1/metrics');
+            const data = await response.json();
+            this.updateMetrics(data);
+            this.updateMonitoringCharts(data);
+        } catch (error) {
+            console.error('Failed to load monitoring data:', error);
         }
     }
 
@@ -637,11 +949,11 @@ class ObjStorApp {
             startedElement.textContent = started;
         }
 
-        // Load storage pools configuration
-        await this.loadStoragePools();
-
         // Load configuration
         await this.loadConfiguration();
+
+        // Load access keys
+        await this.loadAccessKeys();
     }
 
     async loadConfiguration() {
@@ -670,6 +982,116 @@ class ObjStorApp {
             console.error('Failed to load configuration:', error);
             this.showToast('error', 'Error', 'Failed to load configuration');
         }
+    }
+
+    // ===== Access Key Management =====
+
+    async loadAccessKeys() {
+        const container = document.getElementById('access-keys-list');
+        if (!container) return;
+        try {
+            const res = await fetch('/api/v1/access-keys');
+            const data = await res.json();
+            const keys = data.keys || [];
+            if (keys.length === 0) {
+                container.innerHTML = '<div class="ak-empty">No access keys configured</div>';
+                return;
+            }
+            container.innerHTML = keys.map(k => `
+                <div class="ak-item" data-key-id="${this.escHtml(k.access_key_id)}">
+                    <div class="ak-info">
+                        <div class="ak-id">${this.escHtml(k.access_key_id)}</div>
+                        <div class="ak-meta">Created ${this.escHtml(k.created_at || '')} &middot; ${this.escHtml(k.status || '')}</div>
+                    </div>
+                    <div class="ak-actions">
+                        <button class="ak-btn" onclick="app.editAccessKey('${this.escHtml(k.access_key_id)}')">Edit</button>
+                        <button class="ak-btn ak-btn-danger" onclick="app.deleteAccessKey('${this.escHtml(k.access_key_id)}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            container.innerHTML = '<div class="ak-empty">Failed to load access keys</div>';
+        }
+    }
+
+    showAccessKeyModal(existingId, existingSecret) {
+        const title = existingId ? 'Edit Access Key' : 'Add Access Key';
+        const idValue = existingId || '';
+        const secretValue = existingSecret || '';
+        const body = document.getElementById('modal-body');
+        body.innerHTML = `
+            <div class="modal-form-group">
+                <label>Access Key ID</label>
+                <input type="text" id="modal-ak-id" value="${this.escHtml(idValue)}" placeholder="e.g. my-access-key" ${existingId ? 'readonly style="opacity:0.6;cursor:not-allowed;"' : ''}>
+                ${existingId ? '' : '<div class="modal-form-hint">Cannot be changed after creation</div>'}
+            </div>
+            <div class="modal-form-group">
+                <label>Secret Key</label>
+                <input type="text" id="modal-ak-secret" value="${this.escHtml(secretValue)}" placeholder="Enter new secret key">
+            </div>
+            <div class="modal-form-actions">
+                <button class="btn-modal-cancel" onclick="app.closeModal()">Cancel</button>
+                <button class="btn-modal-save" onclick="app.saveAccessKey('${this.escHtml(idValue)}', ${!!existingId})">Save</button>
+            </div>
+        `;
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-overlay').style.display = 'flex';
+    }
+
+    editAccessKey(keyId) {
+        this.showAccessKeyModal(keyId, '');
+    }
+
+    async saveAccessKey(originalId, isEdit) {
+        const id = document.getElementById('modal-ak-id').value.trim();
+        const secret = document.getElementById('modal-ak-secret').value.trim();
+        if (!id || !secret) {
+            this.showToast('error', 'Error', 'Access Key ID and Secret Key are required');
+            return;
+        }
+        try {
+            let res;
+            if (isEdit) {
+                res = await fetch(`/api/v1/access-keys/${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ secret_key: secret }),
+                });
+            } else {
+                res = await fetch('/api/v1/access-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ access_key_id: id, secret_key: secret }),
+                });
+            }
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to save');
+            }
+            this.closeModal();
+            this.showToast('success', 'Access Key', isEdit ? 'Secret key updated' : 'Access key created');
+            await this.loadAccessKeys();
+        } catch (e) {
+            this.showToast('error', 'Error', e.message);
+        }
+    }
+
+    async deleteAccessKey(keyId) {
+        if (!confirm(`Delete access key "${keyId}"?`)) return;
+        try {
+            const res = await fetch(`/api/v1/access-keys/${encodeURIComponent(keyId)}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete');
+            this.showToast('success', 'Access Key', `Deleted "${keyId}"`);
+            await this.loadAccessKeys();
+        } catch (e) {
+            this.showToast('error', 'Error', e.message);
+        }
+    }
+
+    escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
     }
 
     async saveConfiguration() {
@@ -728,71 +1150,6 @@ class ObjStorApp {
             // Restore button
             saveBtn.disabled = false;
             saveBtn.innerHTML = originalText;
-        }
-    }
-
-    updateSettingsPools(data) {
-        // Update storage pools display when receiving metrics
-        this.loadStoragePools();
-    }
-
-    async loadStoragePools() {
-        const container = document.getElementById('settings-pools');
-        if (!container) return;
-
-        try {
-            const response = await fetch('/api/v1/metrics');
-            if (!response.ok) throw new Error('Failed to fetch metrics');
-
-            const data = await response.json();
-            const pools = data.pools || [];
-
-            if (pools.length === 0) {
-                container.innerHTML = '<div class="text-gray text-center py-8">No storage pools configured</div>';
-                return;
-            }
-
-            container.innerHTML = pools.map(pool => {
-                const usagePercent = (pool.usage_ratio * 100).toFixed(2);
-                const usageClass = pool.usage_ratio < 0.5 ? 'low' : pool.usage_ratio < 0.8 ? 'medium' : 'high';
-                const statusClass = pool.status.toLowerCase();
-                const statusText = pool.status;
-
-                return `
-                    <div class="pool-config-card">
-                        <div class="pool-config-header">
-                            <div class="pool-config-title">${pool.id}</div>
-                            <div class="pool-config-status ${statusClass}">${statusText}</div>
-                        </div>
-                        <div class="pool-config-stats">
-                            <div class="pool-stat">
-                                <span class="pool-stat-label">Capacity</span>
-                                <span class="pool-stat-value">${this.formatBytes(pool.capacity)}</span>
-                            </div>
-                            <div class="pool-stat">
-                                <span class="pool-stat-label">Used</span>
-                                <span class="pool-stat-value">${this.formatBytes(pool.used)}</span>
-                            </div>
-                            <div class="pool-stat">
-                                <span class="pool-stat-label">Objects</span>
-                                <span class="pool-stat-value">${pool.objects.toLocaleString()}</span>
-                            </div>
-                            <div class="pool-stat">
-                                <span class="pool-stat-label">Usage</span>
-                                <span class="pool-stat-value">${usagePercent}%</span>
-                            </div>
-                        </div>
-                        <div class="pool-usage-bar">
-                            <div class="pool-usage-bar-bg">
-                                <div class="pool-usage-bar-fill ${usageClass}" style="width: ${usagePercent}%"></div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } catch (error) {
-            container.innerHTML = '<div class="text-red text-center py-8">Failed to load storage pools</div>';
-            console.error('Failed to load storage pools:', error);
         }
     }
 

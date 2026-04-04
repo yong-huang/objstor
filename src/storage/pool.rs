@@ -1,4 +1,5 @@
 use crate::error::{Error, Result};
+use crate::storage::tier::StorageTier;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -14,6 +15,7 @@ pub struct StoragePool {
     pub objects_count: u64,
     pub status: PoolStatus,
     pub config: PoolConfig,
+    pub tier: StorageTier,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -34,6 +36,8 @@ pub struct PoolConfig {
     pub max_objects: u64,
     #[serde(default)]
     pub quota_enabled: bool,
+    #[serde(default = "default_tier")]
+    pub tier: StorageTier,
 }
 
 fn default_capacity() -> u64 {
@@ -42,6 +46,10 @@ fn default_capacity() -> u64 {
 
 fn default_max_objects() -> u64 {
     1_000_000
+}
+
+fn default_tier() -> StorageTier {
+    StorageTier::Hot
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +103,7 @@ impl StoragePool {
             used,
             objects_count,
             status,
+            tier: config.tier,
             config,
         })
     }
@@ -124,10 +133,22 @@ impl StoragePool {
         })
     }
 
-    pub async fn write_object(&mut self, data: &[u8]) -> Result<ObjectLocation> {
-        // Calculate hash
+    /// Write an object to the pool. If the tier is not Hot, compress with zstd.
+    /// The hash is computed on the physical bytes (possibly compressed).
+    pub async fn write_object(&mut self, data: &[u8], tier: &StorageTier) -> Result<ObjectLocation> {
+        // Optionally compress for non-Hot tiers
+        let (physical_data, compressed) = if *tier != StorageTier::Hot && data.len() > 1024 {
+            match zstd::encode_all(data, 3) {
+                Ok(compressed) if compressed.len() < data.len() => (compressed, true),
+                _ => (data.to_vec(), false),
+            }
+        } else {
+            (data.to_vec(), false)
+        };
+
+        // Calculate hash on physical bytes
         let mut hasher = Sha256::new();
-        hasher.update(data);
+        hasher.update(&physical_data);
         let hash = hex::encode(hasher.finalize());
 
         // Create object path
@@ -142,13 +163,18 @@ impl StoragePool {
         let mut file = tokio::fs::File::create(&data_path)
             .await
             .map_err(Error::IoError)?;
-        file.write_all(data).await.map_err(Error::IoError)?;
+        file.write_all(&physical_data).await.map_err(Error::IoError)?;
         file.flush().await.map_err(Error::IoError)?;
 
         // Write metadata
-        let meta = ObjectMetadata {
-            size: data.len() as u64,
+        let meta = PhysicalObjectMetadata {
+            size: physical_data.len() as u64,
             created_at: chrono::Utc::now().to_rfc3339(),
+            compression: if compressed {
+                Some("zstd".to_string())
+            } else {
+                None
+            },
         };
         let meta_json = serde_json::to_string_pretty(&meta).map_err(Error::SerializationError)?;
         tokio::fs::write(&meta_path, meta_json)
@@ -156,7 +182,7 @@ impl StoragePool {
             .map_err(Error::IoError)?;
 
         // Update pool stats
-        self.used += data.len() as u64;
+        self.used += physical_data.len() as u64;
         self.objects_count += 1;
         self.save_metadata().await?;
 
@@ -164,24 +190,49 @@ impl StoragePool {
             pool_id: self.id.clone(),
             object_hash: hash,
             path: data_path,
-            size: data.len() as u64,
+            size: physical_data.len() as u64,
         })
     }
 
+    /// Legacy write_object without tier (always Hot, no compression).
+    pub async fn write_object_legacy(&mut self, data: &[u8]) -> Result<ObjectLocation> {
+        self.write_object(data, &StorageTier::Hot).await
+    }
+
+    /// Read an object from the pool. Automatically decompresses if stored compressed.
     pub async fn read_object(&self, hash: &str) -> Result<Vec<u8>> {
         let prefix = &hash[0..2];
-        let data_path = self
+        let object_dir = self
             .path
             .join("objects")
             .join(prefix)
-            .join(hash)
-            .join("data");
+            .join(hash);
+        let data_path = object_dir.join("data");
 
         if !data_path.exists() {
             return Err(Error::ObjectNotFound(hash.to_string()));
         }
 
-        tokio::fs::read(&data_path).await.map_err(Error::IoError)
+        let raw = tokio::fs::read(&data_path).await.map_err(Error::IoError)?;
+
+        // Check if compressed
+        let meta_path = object_dir.join("meta.json");
+        if meta_path.exists() {
+            let meta_content = tokio::fs::read_to_string(&meta_path)
+                .await
+                .map_err(Error::IoError)?;
+            if let Ok(meta) = serde_json::from_str::<PhysicalObjectMetadata>(&meta_content) {
+                if let Some(ref algo) = meta.compression {
+                    if algo == "zstd" {
+                        return zstd::decode_all(raw.as_slice()).map_err(|_| {
+                            Error::InternalError("Decompression failed".to_string())
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(raw)
     }
 
     pub async fn delete_object(&mut self, hash: &str) -> Result<()> {
@@ -198,7 +249,7 @@ impl StoragePool {
             let meta_content = tokio::fs::read_to_string(&meta_path)
                 .await
                 .map_err(Error::IoError)?;
-            let meta: ObjectMetadata =
+            let meta: PhysicalObjectMetadata =
                 serde_json::from_str(&meta_content).map_err(Error::SerializationError)?;
             meta.size
         } else {
@@ -214,6 +265,20 @@ impl StoragePool {
         self.save_metadata().await?;
 
         Ok(())
+    }
+
+    /// Register an already-existing physical object (dedup hit) by bumping pool stats.
+    pub async fn register_existing_object(&mut self, size: u64) -> Result<()> {
+        self.used += size;
+        self.objects_count += 1;
+        self.save_metadata().await
+    }
+
+    /// Unregister one logical reference (dedup-aware delete).
+    pub async fn unregister_logical_object(&mut self, size: u64) -> Result<()> {
+        self.used = self.used.saturating_sub(size);
+        self.objects_count = self.objects_count.saturating_sub(1);
+        self.save_metadata().await
     }
 
     pub fn get_usage(&self) -> (u64, u64) {
@@ -251,7 +316,9 @@ impl StoragePool {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ObjectMetadata {
+struct PhysicalObjectMetadata {
     size: u64,
     created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    compression: Option<String>,
 }

@@ -142,6 +142,80 @@ impl MetadataStore {
         )
         .map_err(Error::DatabaseError)?;
 
+        // === Schema migrations for advanced storage features ===
+
+        // ref_counts table for deduplication
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS ref_counts (
+                pool_id TEXT NOT NULL,
+                object_hash TEXT NOT NULL,
+                ref_count INTEGER NOT NULL DEFAULT 1,
+                size INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (pool_id, object_hash)
+            )",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+
+        // ALTER TABLE objects — add new columns (safe if column already exists)
+        let _ = conn.execute(
+            "ALTER TABLE objects ADD COLUMN encryption_info TEXT",
+            [],
+        );
+        let _ = conn.execute(
+            "ALTER TABLE objects ADD COLUMN tier TEXT DEFAULT 'HOT'",
+            [],
+        );
+        let _ = conn.execute(
+            "ALTER TABLE objects ADD COLUMN ref_count INTEGER DEFAULT 1",
+            [],
+        );
+
+        // Index for tier-based queries (lifecycle engine)
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_objects_tier ON objects(tier)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+
+        // Index for ref_counts lookups
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ref_counts_hash ON ref_counts(object_hash)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+
+        // audit_logs table
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                method TEXT NOT NULL,
+                path TEXT NOT NULL,
+                status_code INTEGER NOT NULL,
+                bucket TEXT,
+                key TEXT,
+                access_key TEXT,
+                source_ip TEXT,
+                user_agent TEXT,
+                error_message TEXT,
+                duration_ms INTEGER
+            )",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_logs_bucket ON audit_logs(bucket)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp)",
+            [],
+        )
+        .map_err(Error::DatabaseError)?;
+
         Ok(())
     }
 

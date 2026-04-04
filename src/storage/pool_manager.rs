@@ -1,6 +1,7 @@
 use crate::error::{Error, Result};
 use crate::scheduler::{LoadBalancer, SchedulingStrategy};
 use crate::storage::pool::{PoolConfig, StoragePool};
+use crate::storage::tier::StorageTier;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -45,6 +46,29 @@ impl PoolManager {
             // Otherwise use load balancer to select best pool
             self.select_pool_for_object(size).await
         }
+    }
+
+    /// Select pool that matches the given storage tier.
+    /// Falls back to any available pool if no tier-matching pool is found.
+    pub async fn select_pool_for_tier(&self, tier: &StorageTier, size: u64) -> Result<StoragePool> {
+        let pools = self.pools.read().await;
+
+        // Collect matching pool clones for the load balancer
+        let matching: Vec<StoragePool> = pools.iter().filter(|p| p.tier == *tier).cloned().collect();
+
+        if matching.is_empty() {
+            // Fall back to load balancer with all pools
+            drop(pools);
+            return self.select_pool_for_object(size).await;
+        }
+
+        // Use load balancer on matching pools
+        let pool = self
+            .load_balancer
+            .read()
+            .await
+            .select_pool(&matching, size)?;
+        Ok(pool.clone())
     }
 
     pub async fn get_pool(&self, pool_id: &str) -> Result<StoragePool> {

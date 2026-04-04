@@ -127,4 +127,20 @@ impl MetadataStore {
 
         Ok(())
     }
+
+    pub fn update_access_key(&self, access_key_id: &str, new_secret_hash: &str) -> Result<()> {
+        let conn = self.conn().lock().unwrap();
+
+        let rows = conn
+            .execute(
+                "UPDATE access_keys SET secret_key_hash = ?1 WHERE access_key_id = ?2",
+                params![new_secret_hash, access_key_id],
+            )
+            .map_err(Error::DatabaseError)?;
+
+        if rows == 0 {
+            return Err(Error::InvalidAccessKey);
+        }
+        Ok(())
+    }
 }

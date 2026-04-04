@@ -20,8 +20,8 @@ pub async fn websocket_handler(
 async fn handle_socket(socket: WebSocket, state: S3AppState) {
     let (mut sender, mut receiver) = socket.split();
 
-    // Create a channel for broadcasting events
-    let (tx, _rx) = broadcast::channel::<serde_json::Value>(100);
+    // Create a per-connection broadcast channel for metrics/logs
+    let (local_tx, _rx) = broadcast::channel::<serde_json::Value>(100);
 
     // Send initial connection message
     let msg = json!({"type": "connected", "message": "Connected to ObjStor WebSocket"});
@@ -30,7 +30,8 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
     }
 
     // Spawn a task to send periodic metrics updates
-    let tx_clone = tx.clone();
+    let local_tx_clone = local_tx.clone();
+    let state_metrics = state.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
         loop {
@@ -38,10 +39,10 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
 
             // Get all pools
             let pools: Vec<crate::storage::pool::StoragePool> =
-                state.pool_manager.get_all_pools().await;
+                state_metrics.pool_manager.get_all_pools().await;
 
             // Get buckets list
-            let buckets = state.metadata.list_buckets().unwrap_or_default();
+            let buckets = state_metrics.metadata.list_buckets().unwrap_or_default();
             let buckets_data: Vec<serde_json::Value> = buckets
                 .iter()
                 .map(|b| {
@@ -55,7 +56,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 .collect();
 
             // Count total objects from database
-            let total_objects = state
+            let total_objects = state_metrics
                 .metadata
                 .conn()
                 .lock()
@@ -63,10 +64,9 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 .query_row("SELECT COUNT(*) FROM objects", [], |row| row.get(0))
                 .unwrap_or(0);
 
-            // Count objects and used space per pool from database (more accurate than pool.objects_count)
+            // Count objects and used space per pool from database
             let pool_metrics: Vec<serde_json::Value> = pools.iter().map(|p| {
-                // Query actual object count for this pool from database
-                let pool_objects: u64 = state.metadata.conn()
+                let pool_objects: u64 = state_metrics.metadata.conn()
                     .lock()
                     .unwrap()
                     .query_row(
@@ -76,8 +76,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                     )
                     .unwrap_or(0);
 
-                // Query actual used space for this pool from database
-                let pool_used: u64 = state.metadata.conn()
+                let pool_used: u64 = state_metrics.metadata.conn()
                     .lock()
                     .unwrap()
                     .query_row(
@@ -97,7 +96,6 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 })
             }).collect();
 
-            // Calculate total storage from pool metrics (from database, not in-memory values)
             let total_used: u64 = pool_metrics.iter()
                 .filter_map(|p| p["used"].as_u64())
                 .sum();
@@ -119,12 +117,12 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 }
             });
 
-            let _ = tx_clone.send(metrics);
+            let _ = local_tx_clone.send(metrics);
         }
     });
 
     // Spawn a task to send periodic log entries
-    let tx_log = tx.clone();
+    let local_tx_log = local_tx.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
         let mut counter = 0u64;
@@ -133,7 +131,6 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
             interval.tick().await;
             counter += 1;
 
-            // Generate sample log entries based on counter
             let (level, message) = match counter % 10 {
                 0 => ("info", "System health check completed".to_string()),
                 1 => ("info", format!("Processing request #{}", counter)),
@@ -162,18 +159,37 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 }
             });
 
-            let _ = tx_log.send(log);
+            let _ = local_tx_log.send(log);
         }
     });
 
-    // Subscribe to the channel
-    let mut rx = tx.subscribe();
+    // Subscribe to local channel
+    let mut local_rx = local_tx.subscribe();
 
-    // Task to send messages to client
+    // Subscribe to global event bus
+    let mut event_rx = state.event_bus.subscribe();
+
+    // Task to send messages to client (from both local and global sources)
     let send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            if sender.send(Message::Text(msg.to_string())).await.is_err() {
-                break;
+        loop {
+            tokio::select! {
+                msg = local_rx.recv() => {
+                    if let Ok(val) = msg {
+                        if sender.send(Message::Text(val.to_string())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+                msg = event_rx.recv() => {
+                    if let Ok(val) = msg {
+                        if sender.send(Message::Text(val.to_string())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+                else => {
+                    break;
+                }
             }
         }
     });

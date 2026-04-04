@@ -14,3 +14,5 @@ pub mod web;
 
 pub use config::{Config, ServerConfig, StorageConfig, StoragePoolConfig};
 pub use error::{Error, Result};
+pub use storage::encryption::MasterKeyManager;
+pub use storage::tier::StorageTier;

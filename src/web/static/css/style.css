@@ -738,7 +738,18 @@ svg {
     color: white;
 }
 
-.btn-danger:hover {
+/* ===== Dashboard charts two-column grid ===== */
+.dashboard-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
     background: var(--accent-red);
 }
 
@@ -943,6 +954,235 @@ svg {
     cursor: not-allowed;
 }
 
+/* ===== Settings Page Layout ===== */
+
+.settings-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .settings-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.settings-left,
+.settings-right {
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-left .card,
+.settings-right .card {
+    margin-bottom: 0;
+}
+
+/* Form fields in a 2-column grid within cards */
+.settings-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.settings-form-grid .span-2 {
+    grid-column: span 2;
+}
+
+@media (max-width: 600px) {
+    .settings-form-grid,
+    .settings-form-grid .span-2 {
+        grid-column: span 1;
+    }
+}
+
+.settings-form-grid label {
+    color: var(--text-secondary);
+}
+
+/* Info box for scheduler description */
+.settings-info-box {
+    padding: 0.75rem 1rem;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+}
+
+/* System info key-value list */
+.settings-info-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-info-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.settings-info-row:first-child {
+    padding-top: 0;
+}
+
+/* Access key display box */
+.settings-key-box {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background-color: var(--bg-surface);
+}
+
+/* Access key item */
+.ak-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--border-color);
+    gap: 0.5rem;
+}
+.ak-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.ak-item:first-child {
+    padding-top: 0;
+}
+.ak-info {
+    flex: 1;
+    min-width: 0;
+}
+.ak-id {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-family: var(--font-mono, monospace);
+    color: var(--text-main);
+    word-break: break-all;
+}
+.ak-meta {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    margin-top: 0.125rem;
+}
+.ak-actions {
+    display: flex;
+    gap: 0.375rem;
+    flex-shrink: 0;
+}
+.ak-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.375rem;
+    background: var(--bg-surface);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.ak-btn:hover {
+    border-color: var(--accent-blue);
+}
+.ak-btn.ak-btn-danger:hover {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+.ak-empty {
+    text-align: center;
+    padding: 1.5rem 0;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+}
+
+/* Modal form styles */
+.modal-form-group {
+    margin-bottom: 1rem;
+}
+.modal-form-group label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.375rem;
+    color: var(--text-main);
+}
+.modal-form-group input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    color: var(--text-main);
+    box-sizing: border-box;
+}
+.modal-form-group input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+.modal-form-hint {
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+}
+.modal-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+}
+.modal-form-actions button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    transition: all 0.15s;
+}
+.btn-modal-cancel {
+    background: var(--bg-surface);
+    color: var(--text-main);
+}
+.btn-modal-cancel:hover {
+    background: var(--bg-hover);
+}
+.btn-modal-save {
+    background: var(--accent-blue);
+    color: white;
+    border-color: var(--accent-blue) !important;
+}
+.btn-modal-save:hover {
+    opacity: 0.9;
+}
+
+/* Save button - full width, centered at page bottom */
+.settings-save-area {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.settings-save-btn {
+    width: 100%;
+    max-width: 360px;
+    padding: 0.875rem 1.5rem;
+    font-size: 0.9375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* Primary Button */
 .btn-primary {
     display: inline-flex;
@@ -981,4 +1221,119 @@ svg {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* ===== System Resources Grid ===== */
+.system-resources-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 900px) {
+    .system-resources-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .system-resources-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.resource-card {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background-color: var(--bg-surface);
+}
+
+.resource-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.resource-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.resource-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 0.5rem;
+}
+
+.resource-bar {
+    width: 100%;
+    height: 6px;
+    background-color: var(--border-color);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.resource-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease, background-color 0.3s ease;
+    background-color: var(--accent-green);
+}
+
+.resource-bar-fill.warn {
+    background-color: var(--accent-yellow);
+}
+
+.resource-bar-fill.critical {
+    background-color: var(--accent-red);
+}
+
+.resource-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.resource-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.resource-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0;
+    font-size: 0.8rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.resource-info-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.resource-info-row:first-child {
+    padding-top: 0;
+}
+
+.resource-info-row span:first-child {
+    color: var(--text-secondary);
+}
+
+.resource-info-row span:last-child {
+    color: var(--text-main);
+    font-weight: 500;
+    text-align: right;
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

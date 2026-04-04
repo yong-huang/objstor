@@ -46,6 +46,20 @@ pub enum Error {
     // Configuration errors
     ConfigurationError(String),
 
+    // Encryption errors
+    EncryptionError(String),
+    DecryptionError(String),
+
+    // Pre-signed URL errors
+    PreSignedUrlExpired,
+    PreSignedUrlInvalid(String),
+
+    // Range request errors
+    InvalidRange,
+
+    // Rate limiting
+    SlowDown,
+
     // I/O errors
     IoError(std::io::Error),
 
@@ -83,6 +97,12 @@ impl fmt::Display for Error {
             Error::UploadNotFound(id) => write!(f, "Upload not found: {}", id),
             Error::PartNotFound(id) => write!(f, "Part not found: {}", id),
             Error::ConfigurationError(e) => write!(f, "Configuration error: {}", e),
+            Error::EncryptionError(e) => write!(f, "Encryption error: {}", e),
+            Error::DecryptionError(e) => write!(f, "Decryption error: {}", e),
+            Error::PreSignedUrlExpired => write!(f, "Pre-signed URL has expired"),
+            Error::PreSignedUrlInvalid(e) => write!(f, "Invalid pre-signed URL: {}", e),
+            Error::InvalidRange => write!(f, "Invalid byte range"),
+            Error::SlowDown => write!(f, "Slow down - rate limit exceeded"),
             Error::IoError(e) => write!(f, "I/O error: {}", e),
             Error::SerializationError(e) => write!(f, "Serialization error: {}", e),
             Error::InternalError(e) => write!(f, "Internal error: {}", e),
@@ -133,6 +153,28 @@ impl IntoResponse for Error {
             ),
             Error::InvalidPartSize => (StatusCode::BAD_REQUEST, "InvalidPart", self.to_string()),
             Error::UploadNotFound(_) => (StatusCode::NOT_FOUND, "NoSuchUpload", self.to_string()),
+            Error::EncryptionError(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "EncryptionError",
+                self.to_string(),
+            ),
+            Error::DecryptionError(_) => (
+                StatusCode::BAD_REQUEST,
+                "DecryptionError",
+                self.to_string(),
+            ),
+            Error::PreSignedUrlExpired => (
+                StatusCode::FORBIDDEN,
+                "AccessDenied",
+                self.to_string(),
+            ),
+            Error::PreSignedUrlInvalid(_) => (
+                StatusCode::FORBIDDEN,
+                "AccessDenied",
+                self.to_string(),
+            ),
+            Error::InvalidRange => (StatusCode::RANGE_NOT_SATISFIABLE, "InvalidRange", self.to_string()),
+            Error::SlowDown => (StatusCode::SERVICE_UNAVAILABLE, "SlowDown", self.to_string()),
             _ => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "InternalError",

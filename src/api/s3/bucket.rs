@@ -91,6 +91,8 @@ pub async fn handle_create_bucket(
         preferred_pool,
     )?;
 
+    state.event_bus.emit_bucket_created(&bucket_name);
+
     Ok((
         StatusCode::OK,
         [(axum::http::header::CONTENT_TYPE, "application/xml")],
@@ -104,6 +106,7 @@ pub async fn handle_delete_bucket(
     Path(bucket_name): Path<String>,
 ) -> Result<Response> {
     state.metadata.delete_bucket(&bucket_name)?;
+    state.event_bus.emit_bucket_deleted(&bucket_name);
 
     Ok((
         StatusCode::NO_CONTENT,
@@ -119,6 +122,83 @@ pub async fn handle_head_bucket(
 ) -> Result<Response> {
     state.metadata.get_bucket(&bucket_name)?;
 
+    Ok(StatusCode::OK.into_response())
+}
+
+pub async fn handle_get_bucket_location(
+    State(state): State<S3AppState>,
+    Path(bucket_name): Path<String>,
+) -> Result<Response> {
+    let bucket = state.metadata.get_bucket(&bucket_name)?;
+
+    let location = if bucket.region == "us-east-1" || bucket.region.is_empty() {
+        String::new()
+    } else {
+        bucket.region
+    };
+
+    // S3 returns empty content for us-east-1, or region string for others
+    let xml = if location.is_empty() {
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+            <LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\"/>"
+        )
+    } else {
+        format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+            <LocationConstraint xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+            <LocationConstraint>{}</LocationConstraint>\
+            </LocationConstraint>",
+            escape_xml(&location)
+        )
+    };
+
+    Ok((
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/xml")],
+        xml,
+    )
+        .into_response())
+}
+
+pub async fn handle_get_bucket_acl(
+    State(state): State<S3AppState>,
+    Path(bucket_name): Path<String>,
+) -> Result<Response> {
+    state.metadata.get_bucket(&bucket_name)?;
+
+    let xml = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\
+        <AccessControlPolicy xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">\
+        <Owner>\
+        <ID>owner-id</ID>\
+        <DisplayName>Owner</DisplayName>\
+        </Owner>\
+        <AccessControlList>\
+        <Grant>\
+        <Grantee xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:type=\"CanonicalUser\">\
+        <ID>owner-id</ID>\
+        <DisplayName>Owner</DisplayName>\
+        </Grantee>\
+        <Permission>FULL_CONTROL</Permission>\
+        </Grant>\
+        </AccessControlList>\
+        </AccessControlPolicy>"
+    );
+
+    Ok((
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "application/xml")],
+        xml,
+    )
+        .into_response())
+}
+
+pub async fn handle_put_bucket_acl(
+    State(_state): State<S3AppState>,
+    Path(_bucket_name): Path<String>,
+) -> Result<Response> {
+    // Accept ACL changes silently (stub implementation)
     Ok(StatusCode::OK.into_response())
 }
 

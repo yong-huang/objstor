@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::storage::PoolManager;
+use crate::storage::tier::StorageTier;
 use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
@@ -36,7 +37,7 @@ impl ObjectWriter {
     pub async fn finish(self) -> Result<ObjectLocation> {
         let size = self.data.len() as u64;
         let mut pool = self.pool_manager.select_pool_for_object(size).await?;
-        let location = pool.write_object(&self.data).await?;
+        let location = pool.write_object(&self.data, &StorageTier::Hot).await?;
 
         Ok(ObjectLocation {
             pool_id: location.pool_id,
