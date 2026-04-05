@@ -3,6 +3,7 @@ use crate::metadata::db::MetadataStore;
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -20,11 +21,11 @@ struct RequestContext<'a> {
 }
 
 pub struct Signer {
-    metadata_store: MetadataStore,
+    metadata_store: Arc<MetadataStore>,
 }
 
 impl Signer {
-    pub fn new(metadata_store: MetadataStore) -> Self {
+    pub fn new(metadata_store: Arc<MetadataStore>) -> Self {
         Self { metadata_store }
     }
 
@@ -82,19 +83,28 @@ impl Signer {
         let secret_key = &access_key.secret_key;
 
         // Calculate expected signature
+        let (canonical_uri, canonical_querystring) = match uri.split_once('?') {
+            Some((path, query)) => (path, Self::sort_query_string(query)),
+            None => (uri, String::new()),
+        };
+
         let signing_params = SigningParams {
             date: date.to_string(),
             region: region.to_string(),
         };
         let request_ctx = RequestContext {
             method,
-            uri,
+            uri: canonical_uri,
             headers,
             signed_headers,
             body,
         };
-        let expected_signature =
-            self.calculate_signature(&request_ctx, secret_key, &signing_params)?;
+        let expected_signature = self.calculate_signature(
+            &request_ctx,
+            secret_key,
+            &signing_params,
+            &canonical_querystring,
+        )?;
 
         if expected_signature != signature {
             return Err(Error::SignatureMismatch);
@@ -108,10 +118,10 @@ impl Signer {
         request_ctx: &RequestContext,
         secret_key: &str,
         signing_params: &SigningParams,
+        canonical_querystring: &str,
     ) -> Result<String> {
         // 1. Create canonical request
         let canonical_uri = request_ctx.uri;
-        let canonical_querystring = "";
         let canonical_headers =
             self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
         let signed_headers_list = request_ctx.signed_headers;
@@ -185,5 +195,25 @@ impl Signer {
         let mut mac = HmacSha256::new_from_slice(key).map_err(|_| Error::SignatureMismatch)?;
         mac.update(data);
         Ok(mac.finalize().into_bytes().to_vec())
+    }
+
+    /// Sort query string parameters by key name (AWS4 canonical query string).
+    fn sort_query_string(query: &str) -> String {
+        let mut params: Vec<(&str, &str)> = query
+            .split('&')
+            .filter(|s| !s.is_empty())
+            .filter_map(|pair| {
+                let mut parts = pair.splitn(2, '=');
+                let key = parts.next()?;
+                let value = parts.next().unwrap_or("");
+                Some((key, value))
+            })
+            .collect();
+        params.sort_by_key(|(k, _)| *k);
+        params
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join("&")
     }
 }

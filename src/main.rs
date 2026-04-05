@@ -22,6 +22,7 @@ use objstor::{
     web::websocket,
 };
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::{net::SocketAddr, sync::Arc, sync::Mutex as StdMutex};
 use tokio::signal;
 use tower_http::cors::{Any, CorsLayer};
@@ -325,6 +326,46 @@ async fn s3_handler_wrap(State(state): State<S3AppState>, req: Request) -> Respo
                 .unwrap()
         }
     };
+
+    // AWS4 signature authentication
+    let headers_map: HashMap<String, String> = parts
+        .headers
+        .iter()
+        .filter_map(|(k, v)| {
+            Some((k.to_string().to_lowercase(), v.to_str().ok()?.to_string()))
+        })
+        .collect();
+    let signer = objstor::auth::Signer::new(Arc::clone(&state.metadata));
+    let full_uri = format!(
+        "{}{}",
+        parts.uri.path(),
+        parts
+            .uri
+            .query()
+            .map(|q| format!("?{}", q))
+            .unwrap_or_default()
+    );
+    if let Err(e) = signer.verify_request(
+        parts.method.as_str(),
+        &full_uri,
+        &headers_map,
+        &body_bytes,
+    ) {
+        let duration_ms = start.elapsed().as_millis() as i64;
+        let _ = state.metadata.insert_audit_log(
+            parts.method.as_str(),
+            &path,
+            403,
+            Some(bucket_name),
+            path_parts.get(1).copied(),
+            None,
+            Some(&source_ip),
+            user_agent.as_deref(),
+            None,
+            duration_ms,
+        );
+        return e.into_response();
+    }
 
     let response = objstor::api::s3::handler::S3Handler::handle_request(
         parts.method,
