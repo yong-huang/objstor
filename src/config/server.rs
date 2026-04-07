@@ -36,8 +36,8 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             host: "0.0.0.0".to_string(),
-            port: 8080,
-            s3_port: 8080,
+            port: 3020,
+            s3_port: 3020,
             enable_tls: false,
             tls_cert: String::new(),
             tls_key: String::new(),

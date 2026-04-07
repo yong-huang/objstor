@@ -13,6 +13,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use md5::Digest;
 use sha2::Sha256;
+use std::sync::Arc;
 
 /// Header names used for SSE responses.
 static X_AMZ_SERVER_SIDE_ENCRYPTION: HeaderName =
@@ -107,6 +108,23 @@ pub async fn handle_put_object(
 
             state.metadata.create_object(&object)?;
             state.event_bus.emit_object_created(&bucket, &key, body.len() as u64, &etag);
+
+            // Spawn optional auto-tag task
+            if let Ok(cfg) = crate::config::Config::from_file("data/config/objstor.json") {
+                if cfg.ai.enabled && cfg.ai.auto_tag {
+                    let bucket_clone = bucket.clone();
+                    let key_clone = key.clone();
+                    let content_type = object.content_type.clone();
+                    let size = object.size;
+                    let metadata = Arc::clone(&state.metadata);
+                    tokio::spawn(async move {
+                        if let Err(e) = auto_tag_object(&metadata, &bucket_clone, &key_clone, content_type.as_deref(), size).await {
+                            tracing::warn!("Auto-tag failed for {}/{}: {}", bucket_clone, key_clone, e);
+                        }
+                    });
+                }
+            }
+
             return Ok(build_put_response(&etag, &sse_type));
         }
     } else {
@@ -148,6 +166,22 @@ pub async fn handle_put_object(
 
     state.metadata.create_object(&object)?;
     state.event_bus.emit_object_created(&bucket, &key, body.len() as u64, &etag);
+
+    // Spawn optional auto-tag task
+    if let Ok(cfg) = crate::config::Config::from_file("data/config/objstor.json") {
+        if cfg.ai.enabled && cfg.ai.auto_tag {
+            let bucket_clone = bucket.clone();
+            let key_clone = key.clone();
+            let content_type = object.content_type.clone();
+            let size = object.size;
+            let metadata = Arc::clone(&state.metadata);
+            tokio::spawn(async move {
+                if let Err(e) = auto_tag_object(&metadata, &bucket_clone, &key_clone, content_type.as_deref(), size).await {
+                    tracing::warn!("Auto-tag failed for {}/{}: {}", bucket_clone, key_clone, e);
+                }
+            });
+        }
+    }
 
     Ok(build_put_response(&etag, &sse_type))
 }
@@ -758,4 +792,40 @@ fn escape_xml(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+/// Background task: call LLM to generate tags for a newly uploaded object.
+async fn auto_tag_object(
+    metadata: &Arc<crate::metadata::db::MetadataStore>,
+    bucket: &str,
+    key: &str,
+    content_type: Option<&str>,
+    size: u64,
+) -> std::result::Result<(), String> {
+    let config = crate::config::Config::from_file("data/config/objstor.json")
+        .map_err(|e| format!("config: {}", e))?;
+
+    let user_msg = format!(
+        "Filename: {}\nContent-Type: {}\nSize: {} bytes",
+        key,
+        content_type.unwrap_or("unknown"),
+        size,
+    );
+
+    let system_prompt = r#"Generate 3-8 relevant tags for this file as a JSON object where keys are tag names and values are empty strings. Example: {"document": "","invoice": "","finance": ""}
+Respond ONLY with the JSON object, no explanation, no markdown code fences."#;
+
+    let content = crate::api::ai_utils::call_llm(&config, system_prompt, &user_msg)
+        .await
+        .map_err(|_| "LLM error".to_string())?;
+
+    let tags: std::collections::HashMap<String, String> =
+        serde_json::from_str(&content).map_err(|e| format!("parse: {}", e))?;
+
+    metadata
+        .update_object_tags(bucket, key, &tags)
+        .map_err(|e| format!("db: {}", e))?;
+
+    tracing::info!("Auto-tagged {}/{} with {} tags", bucket, key, tags.len());
+    Ok(())
 }

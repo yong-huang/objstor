@@ -340,4 +340,183 @@ impl MetadataStore {
 
         Ok(objects)
     }
+
+    /// Advanced search using a JSON filter with multiple criteria.
+    /// The filter can contain: bucket, prefix, key_contains, min_size, max_size,
+    /// content_type, min_age_days, max_age_days.
+    pub fn search_objects_advanced(
+        &self,
+        filter: &serde_json::Value,
+        bucket: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<Object>> {
+        let conn = self.conn().lock().unwrap();
+
+        let mut conditions = Vec::new();
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        // Override bucket from filter if not provided in argument
+        let effective_bucket = bucket.or_else(|| filter.get("bucket").and_then(|v| v.as_str()));
+
+        if let Some(b) = effective_bucket {
+            conditions.push("bucket = ?".to_string());
+            param_values.push(Box::new(b.to_string()));
+        }
+
+        if let Some(prefix) = filter.get("prefix").and_then(|v| v.as_str()) {
+            if !prefix.is_empty() {
+                conditions.push("key LIKE ?".to_string());
+                param_values.push(Box::new(format!("{}%", prefix)));
+            }
+        }
+
+        if let Some(contains) = filter.get("key_contains").and_then(|v| v.as_str()) {
+            if !contains.is_empty() {
+                conditions.push("key LIKE ?".to_string());
+                param_values.push(Box::new(format!("%{}%", contains)));
+            }
+        }
+
+        if let Some(min_size) = filter.get("min_size").and_then(|v| v.as_u64()) {
+            conditions.push("size >= ?".to_string());
+            param_values.push(Box::new(min_size as i64));
+        }
+
+        if let Some(max_size) = filter.get("max_size").and_then(|v| v.as_u64()) {
+            conditions.push("size <= ?".to_string());
+            param_values.push(Box::new(max_size as i64));
+        }
+
+        if let Some(ct) = filter.get("content_type").and_then(|v| v.as_str()) {
+            if !ct.is_empty() {
+                conditions.push("content_type LIKE ?".to_string());
+                param_values.push(Box::new(format!("%{}%", ct)));
+            }
+        }
+
+        let now_ts = Utc::now().timestamp();
+
+        if let Some(min_age) = filter.get("min_age_days").and_then(|v| v.as_f64()) {
+            let cutoff = now_ts - (min_age * 86400.0) as i64;
+            conditions.push("created_at <= ?".to_string());
+            param_values.push(Box::new(cutoff));
+        }
+
+        if let Some(max_age) = filter.get("max_age_days").and_then(|v| v.as_f64()) {
+            let cutoff = now_ts - (max_age * 86400.0) as i64;
+            conditions.push("created_at >= ?".to_string());
+            param_values.push(Box::new(cutoff));
+        }
+
+        // Always exclude versioned (delete marker) entries
+        conditions.push("version_id IS NULL".to_string());
+
+        let where_clause = conditions.join(" AND ");
+
+        let sql = format!(
+            "SELECT {} FROM objects WHERE {} ORDER BY created_at DESC LIMIT ?",
+            OBJECT_COLUMNS, where_clause
+        );
+
+        let mut stmt = conn.prepare(&sql).map_err(Error::DatabaseError)?;
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+        let mut params_with_limit = param_refs;
+        params_with_limit.push(&limit);
+
+        let rows = stmt
+            .query_map(params_with_limit.as_slice(), object_from_row)
+            .map_err(Error::DatabaseError)?;
+
+        let mut objects = Vec::new();
+        for row in rows {
+            objects.push(row.map_err(Error::DatabaseError)?);
+        }
+
+        Ok(objects)
+    }
+
+    /// Update tags for an object (latest version, no version_id).
+    pub fn update_object_tags(
+        &self,
+        bucket: &str,
+        key: &str,
+        tags: &HashMap<String, String>,
+    ) -> Result<()> {
+        let conn = self.conn().lock().unwrap();
+        let tags_json = serde_json::to_string(tags)?;
+        conn.execute(
+            "UPDATE objects SET tags_json = ?1 WHERE bucket = ?2 AND key = ?3 AND version_id IS NULL",
+            params![tags_json, bucket, key],
+        )
+        .map_err(Error::DatabaseError)?;
+        Ok(())
+    }
+
+    /// Merge new metadata keys into an object's existing metadata_json.
+    pub fn update_object_metadata(
+        &self,
+        bucket: &str,
+        key: &str,
+        new_meta: &serde_json::Value,
+    ) -> Result<()> {
+        let conn = self.conn().lock().unwrap();
+
+        // Load existing metadata
+        let existing: serde_json::Value = conn
+            .query_row(
+                "SELECT metadata_json FROM objects WHERE bucket = ?1 AND key = ?2 AND version_id IS NULL",
+                params![bucket, key],
+                |row| {
+                    let raw: Option<String> = row.get(0)?;
+                    Ok(raw
+                        .and_then(|s| serde_json::from_str(&s).ok())
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new())))
+                },
+            )
+            .map_err(|e| {
+                if let rusqlite::Error::QueryReturnedNoRows = e {
+                    Error::ObjectNotFound(key.to_string())
+                } else {
+                    Error::DatabaseError(e)
+                }
+            })?;
+
+        // Merge new keys into existing
+        let mut merged = existing;
+        if let serde_json::Value::Object(ref mut map) = merged {
+            if let serde_json::Value::Object(new_map) = new_meta {
+                for (k, v) in new_map {
+                    map.insert(k.clone(), v.clone());
+                }
+            }
+        }
+
+        let merged_json = serde_json::to_string(&merged)?;
+        conn.execute(
+            "UPDATE objects SET metadata_json = ?1 WHERE bucket = ?2 AND key = ?3 AND version_id IS NULL",
+            params![merged_json, bucket, key],
+        )
+        .map_err(Error::DatabaseError)?;
+        Ok(())
+    }
+
+    /// List all non-deleted objects across all buckets.
+    pub fn list_all_objects(&self, limit: usize) -> Result<Vec<Object>> {
+        let conn = self.conn().lock().unwrap();
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT {} FROM objects WHERE version_id IS NULL AND object_hash != '' ORDER BY created_at DESC LIMIT ?1",
+                OBJECT_COLUMNS
+            ))
+            .map_err(Error::DatabaseError)?;
+
+        let objects = stmt
+            .query_map(params![limit], object_from_row)
+            .map_err(Error::DatabaseError)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Error::DatabaseError)?;
+
+        Ok(objects)
+    }
 }

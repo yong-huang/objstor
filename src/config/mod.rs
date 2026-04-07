@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
+pub mod ai;
 pub mod server;
 pub mod storage;
 
+pub use ai::AiConfig;
 pub use server::ServerConfig;
 pub use storage::{StorageConfig, StoragePoolConfig};
 
@@ -12,6 +14,8 @@ pub use storage::{StorageConfig, StoragePoolConfig};
 pub struct Config {
     pub server: ServerConfig,
     pub storage: StorageConfig,
+    #[serde(default)]
+    pub ai: AiConfig,
 }
 
 impl Config {

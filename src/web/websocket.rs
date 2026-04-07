@@ -103,6 +103,22 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                 .filter_map(|p| p["capacity"].as_u64())
                 .sum();
 
+            // Bucket storage stats
+            let bucket_stats: Vec<serde_json::Value> = {
+                let conn = state_metrics.metadata.conn().lock().unwrap();
+                let mut bucket_stmt = conn.prepare(
+                    "SELECT bucket, COUNT(*) as object_count, COALESCE(SUM(size), 0) as total_size FROM objects GROUP BY bucket",
+                ).unwrap();
+
+                bucket_stmt.query_map([], |row| {
+                    Ok(json!({
+                        "name": row.get::<_, String>(0)?,
+                        "object_count": row.get::<_, u64>(1)?,
+                        "total_size": row.get::<_, u64>(2)?,
+                    }))
+                }).unwrap().filter_map(|r| r.ok()).collect()
+            };
+
             let metrics = json!({
                 "type": "metrics",
                 "data": {
@@ -114,6 +130,7 @@ async fn handle_socket(socket: WebSocket, state: S3AppState) {
                     "buckets": buckets_data,
                     "pools": pool_metrics,
                     "total_objects": total_objects,
+                    "bucket_stats": bucket_stats,
                 }
             });
 

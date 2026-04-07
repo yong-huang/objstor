@@ -187,6 +187,28 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/access-keys", axum::routing::post(admin::create_access_key))
         .route("/api/v1/access-keys/:key_id", axum::routing::put(admin::update_access_key))
         .route("/api/v1/access-keys/:key_id", axum::routing::delete(admin::delete_access_key))
+        // AI Search
+        .route("/api/v1/ai/models", axum::routing::get(admin::get_ai_models))
+        .route("/api/v1/ai/search", axum::routing::post(admin::ai_search))
+        // AI Auto-Tagging
+        .route("/api/v1/ai/tags", axum::routing::post(admin::ai_generate_tags))
+        .route("/api/v1/ai/tags/bulk", axum::routing::post(admin::ai_bulk_generate_tags))
+        // AI Summarization
+        .route("/api/v1/ai/summarize", axum::routing::post(admin::ai_summarize_object))
+        .route("/api/v1/ai/summarize/bulk", axum::routing::post(admin::ai_bulk_summarize))
+        // AI Chat
+        .route("/api/v1/ai/chat", axum::routing::post(admin::ai_chat))
+        // AI Lifecycle Suggestions
+        .route("/api/v1/ai/lifecycle-suggestions", axum::routing::get(admin::ai_lifecycle_suggestions))
+        // Bucket & Request Stats
+        .route(
+            "/api/v1/bucket-stats",
+            axum::routing::get(admin::get_bucket_stats),
+        )
+        .route(
+            "/api/v1/request-stats",
+            axum::routing::get(admin::get_request_stats),
+        )
         // WebSocket endpoint
         .route("/ws", axum::routing::get(websocket::websocket_handler))
         // Web UI routes (at /web)

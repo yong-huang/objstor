@@ -74,6 +74,10 @@ urlencoding = "2"
 # System information
 sysinfo = "0.32"
 
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+hyper-util = "0.1"
+
 [dev-dependencies]
 criterion = "0.5"
 tokio-test = "0.4"

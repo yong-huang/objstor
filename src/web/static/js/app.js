@@ -11,8 +11,10 @@ class ObjStorApp {
             requestTimestamps: [],
             storageUsed: [],
             poolObjects: {},
+            bucketStats: [],
         };
         this.systemMetricsInterval = null;
+        this.requestStatsInterval = null;
     }
 
     async init() {
@@ -86,6 +88,17 @@ class ObjStorApp {
         if (addKeyBtn) {
             addKeyBtn.addEventListener('click', () => this.showAccessKeyModal());
         }
+
+        // Enter key triggers AI search
+        const aiSearchInput = document.getElementById('ai-search-input');
+        if (aiSearchInput) {
+            aiSearchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.performAiSearch();
+                }
+            });
+        }
     }
 
     async loadPage(page) {
@@ -109,9 +122,15 @@ class ObjStorApp {
         this.currentPage = page;
 
         // Clean up system metrics polling when leaving monitoring page
-        if (page !== 'monitoring' && this.systemMetricsInterval) {
-            clearInterval(this.systemMetricsInterval);
-            this.systemMetricsInterval = null;
+        if (page !== 'monitoring') {
+            if (this.systemMetricsInterval) {
+                clearInterval(this.systemMetricsInterval);
+                this.systemMetricsInterval = null;
+            }
+            if (this.requestStatsInterval) {
+                clearInterval(this.requestStatsInterval);
+                this.requestStatsInterval = null;
+            }
         }
 
         // Load page-specific data
@@ -253,6 +272,15 @@ class ObjStorApp {
         } catch (error) {
             console.error('Failed to load dashboard:', error);
         }
+
+        // Load bucket stats
+        try {
+            const response = await fetch('/api/v1/bucket-stats');
+            const data = await response.json();
+            this.initBucketUsageChart(data.buckets || []);
+        } catch (error) {
+            console.error('Failed to load bucket stats:', error);
+        }
     }
 
     updateMetrics(data) {
@@ -332,6 +360,9 @@ class ObjStorApp {
         this.updateDashboardSummary(metricsData);
         this.updatePoolDonut(metricsData);
         this.updateStorageClassChart();
+        if (metricsData.bucket_stats) {
+            this.updateBucketUsageChart(metricsData.bucket_stats);
+        }
     }
 
     initPoolDonut(metricsData) {
@@ -486,6 +517,61 @@ class ObjStorApp {
         this.charts.storageClass.update('none');
     }
 
+    initBucketUsageChart(bucketStats) {
+        const ctx = document.getElementById('bucket-usage-chart');
+        if (!ctx) return;
+        if (this.charts.bucketUsage) this.charts.bucketUsage.destroy();
+        this.history.bucketStats = bucketStats;
+
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+        this.charts.bucketUsage = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: bucketStats.map(b => b.name),
+                datasets: [{
+                    label: 'Storage Used (MB)',
+                    data: bucketStats.map(b => ((b.total_size || 0) / (1024 * 1024)).toFixed(2)),
+                    backgroundColor: bucketStats.map((_, i) => colors[i % colors.length] + 'cc'),
+                    borderColor: bucketStats.map((_, i) => colors[i % colors.length]),
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { beginAtZero: true, title: { display: true, text: 'MB' } },
+                    y: { ticks: { font: { size: 11 } } }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: (ctx) => {
+                                const bucket = bucketStats[ctx.dataIndex];
+                                return bucket ? `${bucket.object_count || 0} objects` : '';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateBucketUsageChart(bucketStats) {
+        if (!this.charts.bucketUsage || !bucketStats) return;
+        this.history.bucketStats = bucketStats;
+
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+        this.charts.bucketUsage.data.labels = bucketStats.map(b => b.name);
+        this.charts.bucketUsage.data.datasets[0].data = bucketStats.map(b => ((b.total_size || 0) / (1024 * 1024)).toFixed(2));
+        this.charts.bucketUsage.data.datasets[0].backgroundColor = bucketStats.map((_, i) => colors[i % colors.length] + 'cc');
+        this.charts.bucketUsage.data.datasets[0].borderColor = bucketStats.map((_, i) => colors[i % colors.length]);
+        this.charts.bucketUsage.update('none');
+    }
+
     async loadBuckets() {
         try {
             const response = await fetch('/api/v1/buckets');
@@ -626,18 +712,25 @@ class ObjStorApp {
                 ${objects.map(obj => `
                     <div class="object-item">
                         <div class="object-info">
-                            <h3>${obj.key}</h3>
+                            <h3>${this.escHtml(obj.key)}</h3>
                             <div class="object-meta">
                                 <span>${this.formatBytes(obj.size)}</span>
                                 <span>${new Date(obj.lastModified).toLocaleString()}</span>
                             </div>
+                            ${obj.tags && Object.keys(obj.tags).length > 0 ? `<div class="object-tags">${Object.keys(obj.tags).map(t => `<span class="object-tag-chip">${this.escHtml(t)}</span>`).join('')}</div>` : ''}
                         </div>
                         <div class="object-actions">
-                            <button class="btn btn-light" onclick="downloadObject('${bucket}', '${obj.key}')">
+                            <button class="btn btn-light" onclick="app.aiSummarizeObject('${this.escHtml(bucket)}', '${this.escHtml(obj.key)}')" title="Summarize">
+                                <svg viewBox="0 0 24 24"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+                            </button>
+                            <button class="btn btn-light" onclick="app.aiGenerateTags('${this.escHtml(bucket)}', '${this.escHtml(obj.key)}')" title="Auto-Tag">
+                                <svg viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                            </button>
+                            <button class="btn btn-light" onclick="downloadObject('${this.escHtml(bucket)}', '${this.escHtml(obj.key)}')">
                                 <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Download
                             </button>
-                            <button class="btn btn-light" onclick="deleteObject('${bucket}', '${obj.key}')">
+                            <button class="btn btn-light" onclick="deleteObject('${this.escHtml(bucket)}', '${this.escHtml(obj.key)}')">
                                 <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 Delete
                             </button>
@@ -657,6 +750,143 @@ class ObjStorApp {
             i++;
         }
         return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+
+    // ===== AI Search =====
+
+    async fetchAiModels(preserveSelection) {
+        const modelSelect = document.getElementById('config-ai-model');
+        if (!modelSelect) return;
+        const currentVal = preserveSelection || modelSelect.value;
+        modelSelect.innerHTML = '<option value="">Loading...</option>';
+
+        // Read endpoint/key from form inputs (not saved config)
+        const endpoint = (document.getElementById('config-ai-endpoint')?.value || '').trim();
+        const apiKey = (document.getElementById('config-ai-key')?.value || '').trim();
+
+        if (!endpoint) {
+            modelSelect.innerHTML = '<option value="">Enter API endpoint first</option>';
+            return;
+        }
+
+        try {
+            const url = endpoint.replace(/\/+$/, '') + '/v1/models';
+            const headers = { 'Content-Type': 'application/json' };
+            if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+
+            const res = await fetch(url, { headers });
+            if (!res.ok) {
+                modelSelect.innerHTML = `<option value="">HTTP ${res.status}</option>`;
+                return;
+            }
+            const data = await res.json();
+            const models = (data.data || []).map(m => m.id || m.name || '');
+            if (models.length === 0) {
+                modelSelect.innerHTML = '<option value="">No models found</option>';
+                return;
+            }
+            modelSelect.innerHTML = models.map(m =>
+                `<option value="${this.escHtml(m)}" ${m === currentVal ? 'selected' : ''}>${this.escHtml(m)}</option>`
+            ).join('');
+            if (currentVal && models.includes(currentVal)) {
+                modelSelect.value = currentVal;
+            }
+        } catch (e) {
+            modelSelect.innerHTML = '<option value="">Failed to fetch models</option>';
+        }
+    }
+
+    async performAiSearch() {
+        const input = document.getElementById('ai-search-input');
+        const btn = document.getElementById('ai-search-btn');
+        const status = document.getElementById('ai-search-status');
+        const filterDisplay = document.getElementById('ai-search-filter');
+        const container = document.getElementById('objects-list');
+        if (!input || !btn) return;
+
+        const query = input.value.trim();
+        if (!query) {
+            this.showToast('warning', 'Empty Query', 'Please enter a search query.');
+            return;
+        }
+
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;margin-right:0.25rem;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor"/></svg> Searching...';
+        status.style.display = 'block';
+        status.textContent = 'Sending query to LLM...';
+        filterDisplay.style.display = 'none';
+        if (container) container.innerHTML = '<p class="text-gray">Searching...</p>';
+
+        try {
+            const res = await fetch('/api/v1/ai/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || `Server error ${res.status}`);
+            }
+
+            status.textContent = `Found ${data.count} object(s)`;
+            if (data.filter && Object.keys(data.filter).length > 0) {
+                filterDisplay.style.display = 'block';
+                filterDisplay.textContent = 'Filter: ' + JSON.stringify(data.filter);
+            }
+
+            this.updateAiSearchResults(data.objects || []);
+        } catch (e) {
+            status.textContent = 'Error';
+            if (e.message.includes('not enabled')) {
+                status.textContent = 'AI search is not enabled. Enable it in Settings.';
+            } else {
+                status.textContent = e.message;
+            }
+            if (container) container.innerHTML = `<p class="text-gray">Search failed: ${this.escHtml(e.message)}</p>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;margin-right:0.25rem;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Search';
+        }
+    }
+
+    updateAiSearchResults(objects) {
+        const container = document.getElementById('objects-list');
+        if (!container) return;
+
+        if (!objects || objects.length === 0) {
+            container.innerHTML = '<p class="text-gray">No objects matched your search.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="objects-header">
+                <span>AI Search Results</span>
+                <span>${objects.length} objects</span>
+            </div>
+            <div class="objects-list">
+                ${objects.map(obj => `
+                    <div class="object-item">
+                        <div class="object-info">
+                            <h3>${this.escHtml(obj.bucket || '')} / ${this.escHtml(obj.key || '')}</h3>
+                            <div class="object-meta">
+                                <span>${this.formatBytes(obj.size || 0)}</span>
+                                <span>${obj.content_type ? this.escHtml(obj.content_type) : 'unknown type'}</span>
+                                <span>${obj.created_at ? new Date(obj.created_at).toLocaleString() : ''}</span>
+                            </div>
+                            ${obj.tags && Object.keys(obj.tags).length > 0 ? `<div class="object-tags">${Object.keys(obj.tags).map(t => `<span class="object-tag-chip">${this.escHtml(t)}</span>`).join('')}</div>` : ''}
+                        </div>
+                        <div class="object-actions">
+                            <button class="btn btn-light" onclick="downloadObject('${this.escHtml(obj.bucket || '')}', '${this.escHtml(obj.key || '')}')">
+                                <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
     formatUptime(secs) {
@@ -872,6 +1102,135 @@ class ObjStorApp {
         } catch (error) {
             console.error('Failed to load monitoring data:', error);
         }
+
+        // Initialize request analytics charts
+        this.initLatencyChart();
+        this.initStatusChart();
+        this.initMethodsChart();
+        // Load request stats immediately and poll every 10 seconds
+        await this.loadRequestStats();
+        if (this.requestStatsInterval) clearInterval(this.requestStatsInterval);
+        this.requestStatsInterval = setInterval(() => this.loadRequestStats(), 10000);
+    }
+
+    initLatencyChart() {
+        const ctx = document.getElementById('latency-chart');
+        if (!ctx) return;
+        if (this.charts.latency) this.charts.latency.destroy();
+
+        this.charts.latency = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Avg Latency (ms)',
+                    data: [],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    borderWidth: 2,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { display: true, ticks: { font: { size: 10 }, maxRotation: 0 } },
+                    y: { beginAtZero: true, title: { display: true, text: 'ms' } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    initStatusChart() {
+        const ctx = document.getElementById('status-chart');
+        if (!ctx) return;
+        if (this.charts.statusCode) this.charts.statusCode.destroy();
+
+        this.charts.statusCode = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
+                    borderWidth: 0,
+                    hoverOffset: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    initMethodsChart() {
+        const ctx = document.getElementById('methods-chart');
+        if (!ctx) return;
+        if (this.charts.methods) this.charts.methods.destroy();
+
+        this.charts.methods = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    backgroundColor: ['#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#f59e0b'],
+                    borderWidth: 0,
+                    hoverOffset: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 11 } } }
+                }
+            }
+        });
+    }
+
+    async loadRequestStats() {
+        try {
+            const response = await fetch('/api/v1/request-stats');
+            const data = await response.json();
+
+            // Update latency chart
+            if (this.charts.latency && data.latency) {
+                const labels = data.latency.map(d => {
+                    const date = new Date(d.bucket_ts * 1000);
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                });
+                this.charts.latency.data.labels = labels;
+                this.charts.latency.data.datasets[0].data = data.latency.map(d => d.avg_ms.toFixed(1));
+                this.charts.latency.update('none');
+            }
+
+            // Update status code chart
+            if (this.charts.statusCode && data.status_codes) {
+                this.charts.statusCode.data.labels = data.status_codes.map(d => d.class);
+                this.charts.statusCode.data.datasets[0].data = data.status_codes.map(d => d.count);
+                this.charts.statusCode.update('none');
+            }
+
+            // Update methods chart
+            if (this.charts.methods && data.methods) {
+                this.charts.methods.data.labels = data.methods.map(d => d.method);
+                this.charts.methods.data.datasets[0].data = data.methods.map(d => d.count);
+                this.charts.methods.update('none');
+            }
+        } catch (error) {
+            console.error('Failed to load request stats:', error);
+        }
     }
 
     updateUptime() {
@@ -977,6 +1336,19 @@ class ObjStorApp {
             if (config.storage) {
                 document.getElementById('config-scheduler-strategy').value = config.storage.scheduler?.strategy || 'least_loaded';
                 document.getElementById('config-rebalance-threshold').value = config.storage.scheduler?.rebalance_threshold || 0.2;
+            }
+
+            // Update AI config fields
+            if (config.ai) {
+                document.getElementById('config-ai-enabled').value = config.ai.enabled ? 'true' : 'false';
+                document.getElementById('config-ai-endpoint').value = config.ai.api_endpoint || 'http://127.0.0.1:7001';
+                document.getElementById('config-ai-key').value = config.ai.api_key || '';
+                document.getElementById('config-ai-max-tokens').value = config.ai.max_tokens || 1024;
+                document.getElementById('config-ai-timeout').value = config.ai.timeout_secs || 15;
+                document.getElementById('config-ai-auto-tag').value = config.ai.auto_tag ? 'true' : 'false';
+                if (config.ai.enabled && config.ai.api_endpoint) {
+                    this.fetchAiModels(config.ai.model || '');
+                }
             }
         } catch (error) {
             console.error('Failed to load configuration:', error);
@@ -1094,6 +1466,205 @@ class ObjStorApp {
         return d.innerHTML;
     }
 
+    // ===== AI Auto-Tagging =====
+
+    async aiGenerateTags(bucket, key) {
+        try {
+            const res = await fetch('/api/v1/ai/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bucket, key }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            this.showToast('success', 'Tags Generated', `${Object.keys(data.tags || {}).length} tags for ${key}`);
+            // Refresh objects list
+            const selector = document.getElementById('bucket-selector');
+            if (selector && selector.value) {
+                await this.loadObjects(selector.value);
+            }
+        } catch (e) {
+            this.showToast('error', 'Auto-Tag Error', e.message);
+        }
+    }
+
+    async bulkGenerateTags() {
+        const selector = document.getElementById('bucket-selector');
+        const bucket = selector ? selector.value : '';
+        if (!bucket) {
+            this.showToast('warning', 'No Bucket', 'Select a bucket first.');
+            return;
+        }
+        this.showToast('info', 'Auto-Tagging', `Tagging objects in ${bucket}...`);
+        try {
+            const res = await fetch('/api/v1/ai/tags/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bucket }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            this.showToast('success', 'Auto-Tag Complete', `Tagged ${data.tagged_count || 0} objects`);
+            await this.loadObjects(bucket);
+        } catch (e) {
+            this.showToast('error', 'Bulk Tag Error', e.message);
+        }
+    }
+
+    // ===== AI Summarization =====
+
+    async aiSummarizeObject(bucket, key) {
+        try {
+            const res = await fetch('/api/v1/ai/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bucket, key }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+
+            this.showToast('success', 'Summary Generated', `Summary for ${key}`);
+
+            // Find the object item and inject summary below it
+            const objectItems = document.querySelectorAll('.object-item');
+            for (const item of objectItems) {
+                const h3 = item.querySelector('h3');
+                if (h3 && h3.textContent.includes(key)) {
+                    // Remove existing summary if any
+                    const existing = item.parentElement.querySelector('.object-summary');
+                    if (existing) existing.remove();
+                    // Insert after the object item
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = 'object-summary';
+                    summaryDiv.innerHTML = `<strong>AI Summary:</strong> ${this.escHtml(data.summary)}`;
+                    item.after(summaryDiv);
+                    break;
+                }
+            }
+        } catch (e) {
+            this.showToast('error', 'Summarize Error', e.message);
+        }
+    }
+
+    async bulkSummarize() {
+        const selector = document.getElementById('bucket-selector');
+        const bucket = selector ? selector.value : '';
+        if (!bucket) {
+            this.showToast('warning', 'No Bucket', 'Select a bucket first.');
+            return;
+        }
+        this.showToast('info', 'Summarizing', `Summarizing text objects in ${bucket}...`);
+        try {
+            const res = await fetch('/api/v1/ai/summarize/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bucket }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            this.showToast('success', 'Summarize Complete', `Summarized ${data.summarized_count || 0} objects`);
+        } catch (e) {
+            this.showToast('error', 'Bulk Summarize Error', e.message);
+        }
+    }
+
+    // ===== AI Chat =====
+
+    toggleAiChat() {
+        const panel = document.getElementById('ai-chat-panel');
+        if (!panel) return;
+        panel.classList.toggle('open');
+        const input = document.getElementById('ai-chat-input');
+        if (input && panel.classList.contains('open')) {
+            setTimeout(() => input.focus(), 300);
+        }
+    }
+
+    async sendAiChat() {
+        const input = document.getElementById('ai-chat-input');
+        if (!input) return;
+        const message = input.value.trim();
+        if (!message) return;
+
+        input.value = '';
+        this.appendChatMessage('user', message);
+
+        // Show typing indicator
+        const typingId = this.appendChatMessage('system', 'Thinking...');
+
+        try {
+            const res = await fetch('/api/v1/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message }),
+            });
+            const data = await res.json();
+            this.removeLastChatMessage(); // Remove typing indicator
+            if (!res.ok) throw new Error(data.error || 'Failed');
+            this.appendChatMessage('system', data.response || 'No response');
+        } catch (e) {
+            this.removeLastChatMessage();
+            this.appendChatMessage('system', `Error: ${e.message}`);
+        }
+    }
+
+    appendChatMessage(role, text) {
+        const container = document.getElementById('ai-chat-messages');
+        if (!container) return;
+        const div = document.createElement('div');
+        div.className = `ai-chat-msg ai-chat-${role}`;
+        div.textContent = text;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        return div;
+    }
+
+    removeLastChatMessage() {
+        const container = document.getElementById('ai-chat-messages');
+        if (!container || !container.lastChild) return;
+        container.removeChild(container.lastChild);
+    }
+
+    // ===== AI Lifecycle Suggestions =====
+
+    async loadLifecycleSuggestions() {
+        const card = document.getElementById('lifecycle-suggestions-card');
+        const content = document.getElementById('lifecycle-suggestions-content');
+        if (!card || !content) return;
+
+        card.style.display = 'block';
+        content.innerHTML = '<p class="text-gray"><svg viewBox="0 0 24 24" style="width:16px;height:16px;display:inline-block;vertical-align:middle;animation:spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"/><path d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" fill="currentColor"/></svg> Analyzing storage patterns...</p>';
+
+        try {
+            const res = await fetch('/api/v1/ai/lifecycle-suggestions');
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed');
+
+            const suggestions = data.suggestions || [];
+            if (suggestions.length === 0) {
+                content.innerHTML = '<p class="text-gray">No lifecycle suggestions at this time. Your storage patterns look good!</p>';
+                return;
+            }
+
+            content.innerHTML = suggestions.map((s, i) => `
+                <div class="lifecycle-suggestion-item">
+                    <div class="lifecycle-suggestion-header">
+                        <span style="font-weight:600;">Rule #${i + 1}</span>
+                        <span class="lifecycle-tier-badge">${this.escHtml(s.source_tier || 'hot')}</span>
+                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:var(--text-muted);"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                        <span class="lifecycle-tier-badge">${this.escHtml(s.destination_tier || 'cold')}</span>
+                        <span style="margin-left:auto;font-size:0.75rem;color:var(--text-secondary);">${s.transition_days || '?'} days</span>
+                    </div>
+                    <div class="lifecycle-reasoning">
+                        <strong>Prefix:</strong> ${this.escHtml(s.prefix || '*')} &mdash; ${this.escHtml(s.reasoning || 'No reasoning provided')}
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) {
+            content.innerHTML = `<p class="text-gray" style="color:var(--accent-red);">Failed: ${this.escHtml(e.message)}</p>`;
+        }
+    }
+
     async saveConfiguration() {
         const saveBtn = document.getElementById('save-config-btn');
         const originalText = saveBtn.innerHTML;
@@ -1124,6 +1695,15 @@ class ObjStorApp {
                         strategy: document.getElementById('config-scheduler-strategy').value,
                         rebalance_threshold: parseFloat(document.getElementById('config-rebalance-threshold').value),
                     }
+                },
+                ai: {
+                    enabled: document.getElementById('config-ai-enabled').value === 'true',
+                    api_endpoint: document.getElementById('config-ai-endpoint').value,
+                    api_key: document.getElementById('config-ai-key').value,
+                    model: document.getElementById('config-ai-model').value,
+                    max_tokens: parseInt(document.getElementById('config-ai-max-tokens').value) || 1024,
+                    timeout_secs: parseInt(document.getElementById('config-ai-timeout').value) || 15,
+                    auto_tag: document.getElementById('config-ai-auto-tag').value === 'true',
                 }
             };
 

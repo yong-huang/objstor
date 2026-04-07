@@ -750,8 +750,6 @@ svg {
         grid-template-columns: 1fr;
     }
 }
-    background: var(--accent-red);
-}
 
 /* Grid Layout */
 .grid {
@@ -973,6 +971,7 @@ svg {
 .settings-right {
     display: flex;
     flex-direction: column;
+    gap: 1.5rem;
 }
 
 .settings-left .card,
@@ -984,7 +983,8 @@ svg {
 .settings-form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    gap: 1rem 1.25rem;
+    row-gap: 1.25rem;
 }
 
 .settings-form-grid .span-2 {
@@ -1000,6 +1000,8 @@ svg {
 
 .settings-form-grid label {
     color: var(--text-secondary);
+    display: block;
+    margin-bottom: 0.375rem;
 }
 
 /* Info box for scheduler description */
@@ -1336,4 +1338,221 @@ svg {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ===== AI Chat Panel ===== */
+
+.ai-chat-fab {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ai-chat-fab:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
+}
+
+.ai-chat-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 380px;
+    height: 100vh;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    transition: right 0.3s ease;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.ai-chat-panel.open {
+    right: 0;
+}
+
+.ai-chat-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+    background: var(--bg-surface);
+}
+
+.ai-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ai-chat-msg {
+    max-width: 85%;
+    padding: 0.625rem 0.875rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.ai-chat-system {
+    align-self: flex-start;
+    background: var(--bg-surface);
+    color: var(--text-main);
+    border: 1px solid var(--border-color);
+}
+
+.ai-chat-user {
+    align-self: flex-end;
+    background: var(--accent-blue);
+    color: white;
+}
+
+.ai-chat-input-area {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-surface);
+}
+
+.ai-chat-input {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--bg-input);
+    color: var(--text-main);
+    font-size: 0.875rem;
+    outline: none;
+}
+
+.ai-chat-input:focus {
+    border-color: var(--accent-blue);
+}
+
+.ai-chat-send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.15s;
+}
+
+.ai-chat-send:hover {
+    opacity: 0.85;
+}
+
+/* ===== Object Tags ===== */
+
+.object-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.object-tag-chip {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border-radius: 9999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+[data-theme="dark"] .object-tag-chip {
+    background: #1e3a5f;
+    color: #93c5fd;
+}
+
+/* ===== Object Summary ===== */
+
+.object-summary {
+    padding: 0.75rem 1rem;
+    margin: 0 1rem;
+    border-left: 3px solid var(--accent-blue);
+    background: var(--bg-surface);
+    border-radius: 0 0.375rem 0.375rem 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.object-summary strong {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+/* ===== Lifecycle Suggestions ===== */
+
+.lifecycle-suggestion-item {
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-surface);
+}
+
+.lifecycle-suggestion-item:last-child {
+    margin-bottom: 0;
+}
+
+.lifecycle-suggestion-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    font-size: 0.85rem;
+}
+
+.lifecycle-tier-badge {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    background: var(--accent-blue);
+    color: white;
+}
+
+.lifecycle-tier-badge:not(:first-of-type) {
+    background: var(--accent-green);
+}
+
+.lifecycle-reasoning {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.lifecycle-reasoning strong {
+    color: var(--text-main);
 }
