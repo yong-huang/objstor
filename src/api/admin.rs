@@ -196,6 +196,37 @@ pub async fn get_buckets_api(State(state): State<S3AppState>) -> impl IntoRespon
     }))
 }
 
+pub async fn list_objects_api(
+    State(state): State<S3AppState>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> impl IntoResponse {
+    let bucket = match params.get("bucket") {
+        Some(b) => b.clone(),
+        None => return Json(serde_json::json!({"error": "Missing bucket parameter"})).into_response(),
+    };
+    let objects = state
+        .metadata
+        .list_objects(&bucket, None, 10000)
+        .unwrap_or_default();
+
+    let objects_data: Vec<serde_json::Value> = objects
+        .iter()
+        .map(|o| {
+            serde_json::json!({
+                "key": o.key,
+                "size": o.size,
+                "etag": o.etag,
+                "last_modified": o.last_modified.to_rfc3339(),
+                "storage_class": o.storage_class,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "objects": objects_data
+    })).into_response()
+}
+
 pub async fn get_config() -> impl IntoResponse {
     match Config::from_file("data/config/objstor.json") {
         Ok(config) => Json(serde_json::json!({

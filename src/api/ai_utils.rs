@@ -164,6 +164,7 @@ pub async fn call_llm(
         ],
         "temperature": 0.0,
         "max_tokens": config.ai.max_tokens,
+        "chat_template_kwargs": { "enable_thinking": false },
     });
 
     let body_str = serde_json::to_string(&req_body).unwrap_or_default();

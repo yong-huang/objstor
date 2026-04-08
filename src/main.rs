@@ -184,6 +184,8 @@ async fn main() -> anyhow::Result<()> {
         )
         // Access Keys
         .route("/api/v1/access-keys", axum::routing::get(admin::list_access_keys))
+        // Object listing (admin API, no S3 auth required)
+        .route("/api/v1/objects", axum::routing::get(admin::list_objects_api))
         .route("/api/v1/access-keys", axum::routing::post(admin::create_access_key))
         .route("/api/v1/access-keys/:key_id", axum::routing::put(admin::update_access_key))
         .route("/api/v1/access-keys/:key_id", axum::routing::delete(admin::delete_access_key))
@@ -212,6 +214,7 @@ async fn main() -> anyhow::Result<()> {
         // WebSocket endpoint
         .route("/ws", axum::routing::get(websocket::websocket_handler))
         // Web UI routes (at /web)
+        .route("/", axum::routing::get(redirect_to_web))
         .route("/web", axum::routing::get(web_handler))
         // Static assets (CSS, JS)
         .nest_service("/static", ServeDir::new("src/web/static"))
@@ -413,6 +416,14 @@ async fn s3_handler_wrap(State(state): State<S3AppState>, req: Request) -> Respo
     );
 
     response
+}
+
+async fn redirect_to_web() -> Response {
+    Response::builder()
+        .status(StatusCode::MOVED_PERMANENTLY)
+        .header("Location", "/web")
+        .body(axum::body::Body::empty())
+        .unwrap()
 }
 
 async fn web_handler() -> Response {

@@ -1385,6 +1385,15 @@ svg {
     right: 0;
 }
 
+body.ai-chat-open .page-content.active {
+    transform: translateX(-200px);
+    transition: transform 0.3s ease;
+}
+
+.page-content.active {
+    transition: transform 0.3s ease;
+}
+
 .ai-chat-header {
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
@@ -1420,6 +1429,67 @@ svg {
     color: var(--text-main);
     border: 1px solid var(--border-color);
 }
+
+/* Markdown content in AI chat messages */
+.ai-chat-system p { margin: 0 0 0.5em 0; }
+.ai-chat-system p:last-child { margin-bottom: 0; }
+.ai-chat-system code {
+    background: rgba(0,0,0,0.08);
+    padding: 0.125em 0.375em;
+    border-radius: 4px;
+    font-size: 0.8125em;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+[data-theme="dark"] .ai-chat-system code { background: rgba(255,255,255,0.1); }
+.ai-chat-system pre {
+    background: rgba(0,0,0,0.06);
+    padding: 0.625rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 0.5em 0;
+}
+[data-theme="dark"] .ai-chat-system pre { background: rgba(255,255,255,0.08); }
+.ai-chat-system pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.8125em;
+}
+.ai-chat-system ul, .ai-chat-system ol {
+    margin: 0.5em 0;
+    padding-left: 1.25em;
+}
+.ai-chat-system li { margin-bottom: 0.25em; }
+.ai-chat-system strong { font-weight: 600; }
+.ai-chat-system h1, .ai-chat-system h2, .ai-chat-system h3 {
+    margin: 0.75em 0 0.375em 0;
+    font-weight: 600;
+}
+.ai-chat-system h1 { font-size: 1em; }
+.ai-chat-system h2 { font-size: 0.9375em; }
+.ai-chat-system h3 { font-size: 0.875em; }
+.ai-chat-system a { color: var(--accent-blue); }
+.ai-chat-system blockquote {
+    border-left: 3px solid var(--border-color);
+    margin: 0.5em 0;
+    padding-left: 0.75em;
+    color: var(--text-secondary);
+}
+.ai-chat-system table {
+    border-collapse: collapse;
+    margin: 0.5em 0;
+    font-size: 0.8125em;
+    width: 100%;
+}
+.ai-chat-system th, .ai-chat-system td {
+    border: 1px solid var(--border-color);
+    padding: 0.375rem 0.5rem;
+    text-align: left;
+}
+.ai-chat-system th {
+    background: rgba(0,0,0,0.04);
+    font-weight: 600;
+}
+[data-theme="dark"] .ai-chat-system th { background: rgba(255,255,255,0.06); }
 
 .ai-chat-user {
     align-self: flex-end;

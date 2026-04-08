@@ -22,6 +22,7 @@ class ObjStorApp {
         this.setupNavigation();
         this.setupConfigActions();
         this.connectWebSocket();
+        this.loadChatHistory();
         await this.loadPage('dashboard');
         this.updateUptime();
         setInterval(() => this.updateUptime(), 1000);
@@ -657,14 +658,18 @@ class ObjStorApp {
 
     async loadObjectsList(bucket) {
         try {
-            // Use S3 API to list objects
-            const response = await fetch(`/${encodeURIComponent(bucket)}?list-type=2`);
+            const response = await fetch(`/api/v1/objects?bucket=${encodeURIComponent(bucket)}`);
             if (!response.ok) {
                 throw new Error(`Failed to list objects: ${response.status}`);
             }
 
-            const xmlText = await response.text();
-            const objects = this.parseS3ListObjectsResponse(xmlText);
+            const data = await response.json();
+            const objects = (data.objects || []).map(o => ({
+                key: o.key || '',
+                size: o.size || 0,
+                lastModified: o.last_modified || '',
+                etag: o.etag || '',
+            }));
             this.updateObjectsList(objects, bucket);
         } catch (error) {
             console.error('Failed to load objects:', error);
@@ -1570,10 +1575,54 @@ class ObjStorApp {
 
     // ===== AI Chat =====
 
+    loadChatHistory() {
+        const container = document.getElementById('ai-chat-messages');
+        if (!container) return;
+        try {
+            const history = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+            history.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `ai-chat-msg ai-chat-${msg.role}`;
+                if (msg.role === 'user') {
+                    div.textContent = msg.text;
+                } else {
+                    div.innerHTML = this.renderMarkdown(msg.text);
+                }
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        } catch (e) { /* ignore */ }
+    }
+
+    saveChatHistory() {
+        const container = document.getElementById('ai-chat-messages');
+        if (!container) return;
+        const messages = Array.from(container.querySelectorAll('.ai-chat-msg')).map(el => ({
+            role: el.classList.contains('ai-chat-user') ? 'user' : 'system',
+            text: el.textContent,
+        }));
+        localStorage.setItem('ai_chat_history', JSON.stringify(messages));
+    }
+
+    renderMarkdown(text) {
+        if (typeof marked !== 'undefined') {
+            return marked.parse(text);
+        }
+        // Fallback: basic escaping
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    }
+
+    clearChatHistory() {
+        localStorage.removeItem('ai_chat_history');
+        const container = document.getElementById('ai-chat-messages');
+        if (container) container.innerHTML = '';
+    }
+
     toggleAiChat() {
         const panel = document.getElementById('ai-chat-panel');
         if (!panel) return;
         panel.classList.toggle('open');
+        document.body.classList.toggle('ai-chat-open', panel.classList.contains('open'));
         const input = document.getElementById('ai-chat-input');
         if (input && panel.classList.contains('open')) {
             setTimeout(() => input.focus(), 300);
@@ -1590,7 +1639,7 @@ class ObjStorApp {
         this.appendChatMessage('user', message);
 
         // Show typing indicator
-        const typingId = this.appendChatMessage('system', 'Thinking...');
+        this.appendChatMessage('system', 'Thinking...');
 
         try {
             const res = await fetch('/api/v1/ai/chat', {
@@ -1606,6 +1655,7 @@ class ObjStorApp {
             this.removeLastChatMessage();
             this.appendChatMessage('system', `Error: ${e.message}`);
         }
+        this.saveChatHistory();
     }
 
     appendChatMessage(role, text) {
@@ -1613,7 +1663,11 @@ class ObjStorApp {
         if (!container) return;
         const div = document.createElement('div');
         div.className = `ai-chat-msg ai-chat-${role}`;
-        div.textContent = text;
+        if (role === 'user') {
+            div.textContent = text;
+        } else {
+            div.innerHTML = this.renderMarkdown(text);
+        }
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
         return div;
