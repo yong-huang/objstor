@@ -126,8 +126,11 @@ impl Signer {
             self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
         let signed_headers_list = request_ctx.signed_headers;
 
-        // Hash payload
-        let payload_hash = hex::encode(sha2::Sha256::digest(request_ctx.body));
+        // Use the content hash from headers (may be UNSIGNED-PAYLOAD for streaming)
+        let payload_hash = match request_ctx.headers.get("x-amz-content-sha256") {
+            Some(hash) => hash.clone(),
+            None => hex::encode(sha2::Sha256::digest(request_ctx.body)),
+        };
 
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\n{}",
