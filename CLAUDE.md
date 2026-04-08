@@ -15,7 +15,7 @@ cargo build
 # Build (release)
 cargo build --release
 
-# Run server (default port 8080)
+# Run server (default port 3020)
 cargo run
 
 # Run with debug logging
@@ -68,9 +68,10 @@ Objects are content-addressable: data is SHA256-hashed, stored under `data/pools
 
 ### Key Modules
 
-- `src/config/` — JSON config (`data/config/objstor.json`). Auto-created with defaults on first run.
+- `src/config/` — JSON config (`data/config/objstor.json`). Auto-created with defaults on first run. Includes `ai.rs` for LLM settings.
 - `src/error.rs` — Unified `Error` enum that maps to S3 error codes and HTTP status via `IntoResponse`.
-- `src/api/s3/auth.rs` — AWS4 signature detection only; full verification is stubbed.
+- `src/api/s3/auth.rs` — AWS4-HMAC-SHA256 signature verification.
+- `src/api/ai_utils.rs` — Shared LLM integration using hyper (bypasses reqwest). Provides `call_llm()` and `http_request()`.
 - `src/scheduler/` — Pool selection strategies. `LoadBalancer` selects pools based on health, capacity, and I/O metrics.
 - `src/web/` — Dashboard UI served as static files from `src/web/static/`. WebSocket at `/ws` pushes metrics every 5s.
 - `src/logging/` — tracing-based logging with daily rotation.
@@ -82,7 +83,7 @@ SQLite at `data/metadata.db` with tables: `buckets`, `objects` (with versioning 
 ## Configuration
 
 Config file: `data/config/objstor.json`. Created with defaults on first run. Key settings:
-- Server port (default 8080)
+- Server port (default 3020)
 - Storage data directory (default `./data`)
 - Pool definitions (id, path, capacity, max_objects, quota_enabled)
 - Scheduler strategy (default `least_loaded`)
@@ -94,11 +95,11 @@ Default credentials: `test-access-key` / `test-secret-key`, region `us-east-1`.
 ```bash
 export AWS_ACCESS_KEY_ID=test-access-key
 export AWS_SECRET_ACCESS_KEY=test-secret-key
-aws s3 ls --endpoint-url http://localhost:8080
+aws s3 ls --endpoint-url http://localhost:3020
 ```
 
 ## Common Issues
 
-- **Port in use**: Kill process on 8080 or change port in config
+- **Port in use**: Kill process on 3020 or change port in config
 - **Database locked**: Only one process should access `data/metadata.db` at a time (WAL mode)
 - **Permission errors**: Ensure write access to `./data` directory

@@ -1,0 +1,29 @@
+{
+  "name": "objstor",
+  "version": "1.0.0",
+  "description": "<p align=\"center\">   <strong>S3-Compatible Object Storage with Built-in AI Intelligence</strong> </p>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yong-huang/objstor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yong-huang/objstor/issues"
+  },
+  "homepage": "https://github.com/yong-huang/objstor#readme",
+  "dependencies": {
+    "playwright": "^1.59.1"
+  }
+}

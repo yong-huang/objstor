@@ -9,15 +9,23 @@ objstor/
 │   ├── lib.rs               # Library exports
 │   ├── api/                 # API layer
 │   │   ├── s3/             # S3 protocol implementation
-│   │   ├── admin.rs        # Admin API
-│   │   └── middleware.rs   # Middleware
+│   │   ├── admin.rs        # Admin & AI API endpoints
+│   │   ├── ai_utils.rs     # LLM integration utilities
+│   │   ├── events.rs       # Event bus
+│   │   ├── middleware.rs   # Middleware
+│   │   └── rate_limit.rs   # Rate limiting
 │   ├── storage/             # Storage engine
 │   │   ├── pool.rs         # Storage pool
 │   │   ├── pool_manager.rs # Pool manager
+│   │   ├── dedup.rs        # Deduplication
+│   │   ├── encryption.rs   # Encryption (SSE-S3, SSE-C)
+│   │   ├── tier.rs         # Storage tiers
+│   │   ├── lifecycle.rs    # Lifecycle management
 │   │   └── multipart.rs    # Multipart upload
 │   ├── scheduler/           # Scheduler system
 │   │   ├── load_balancer.rs # Load balancing
-│   │   └── placement.rs     # Data placement
+│   │   ├── placement.rs     # Data placement
+│   │   └── metrics.rs       # Performance metrics
 │   ├── metadata/            # Metadata storage
 │   ├── auth/               # Authentication & authorization
 │   ├── logging/            # Logging system
@@ -26,8 +34,7 @@ objstor/
 │
 ├── tests/                   # Tests
 │   ├── integration_test.rs # Integration tests
-│   ├── api_test.rs        # API tests
-│   └── cli_test.sh        # CLI test scripts
+│   └── api_test.rs        # API tests
 │
 ├── scripts/                 # Utility scripts
 │   ├── benchmark.sh       # Performance tests
@@ -161,9 +168,6 @@ cargo test --test integration_test
 
 # API tests (requires running service)
 ./tests/api_test.sh
-
-# CLI tests
-./tests/cli_test.sh
 ```
 
 ## Documentation Overview
@@ -244,7 +248,7 @@ Use `examples/alerts/objstor.yml` for configuration
 ## Troubleshooting
 
 ### Common Issues
-1. **Port Conflict**: Check if port 8080 is occupied
+1. **Port Conflict**: Check if port 3020 is occupied
 2. **Permission Issues**: Ensure storage directory has write permissions
 3. **Configuration Errors**: Verify JSON format is correct
 4. **Database Lock**: SQLite uses WAL mode

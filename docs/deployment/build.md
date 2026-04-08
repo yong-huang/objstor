@@ -88,8 +88,8 @@ cargo run
 ```
 
 The server will start on:
-- **Web UI**: http://localhost:8080
-- **S3 API**: http://localhost:8080/ (same port, different path)
+- **Web UI**: http://localhost:3020
+- **S3 API**: http://localhost:3020/ (same port, different path)
 
 ### 5. Using Makefile
 
@@ -136,10 +136,10 @@ docker run --rm -v objstor_data:/data alpine ls -la /data
 
 ### Port Already in Use
 
-If port 8080 is already in use, you can change it in `src/main.rs`:
+If port 3020 is already in use, you can change it in `src/main.rs`:
 
 ```rust
-let addr = SocketAddr::from(([0, 0, 0, 0], 8080));  // Change this
+let addr = SocketAddr::from(([0, 0, 0, 0], 3020));  // Change this
 ```
 
 ### Build Errors
@@ -224,7 +224,7 @@ Example configuration:
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
+    "port": 3020,
     "log_level": "info",
     "log_dir": "./logs"
   },
@@ -283,7 +283,7 @@ The release profile in `Cargo.toml` includes:
 After building and running:
 
 ### Using Web UI
-1. Open http://localhost:8080
+1. Open http://localhost:3020
 2. View dashboard with storage metrics
 3. Create buckets and upload objects
 
@@ -294,18 +294,18 @@ export AWS_ACCESS_KEY_ID=test-access-key
 export AWS_SECRET_ACCESS_KEY=test-secret-key
 
 # Test with AWS CLI
-aws s3 ls --endpoint-url http://localhost:8080
-aws s3 mb s3://test-bucket --endpoint-url http://localhost:8080
-aws s3 cp file.txt s3://test-bucket/ --endpoint-url http://localhost:8080
+aws s3 ls --endpoint-url http://localhost:3020
+aws s3 mb s3://test-bucket --endpoint-url http://localhost:3020
+aws s3 cp file.txt s3://test-bucket/ --endpoint-url http://localhost:3020
 ```
 
 ### Monitoring
 ```bash
 # View metrics
-curl http://localhost:8080/api/v1/metrics
+curl http://localhost:3020/api/v1/metrics
 
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:3020/health
 ```
 
 ### Advanced Configuration

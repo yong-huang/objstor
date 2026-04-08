@@ -10,8 +10,8 @@ ObjStor uses JSON configuration files to manage server and storage pool settings
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
-    "s3_port": 8080,
+    "port": 3020,
+    "s3_port": 3020,
     "enable_tls": false,
     "tls_cert": "",
     "tls_key": "",
@@ -45,8 +45,8 @@ ObjStor uses JSON configuration files to manage server and storage pool settings
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `host` | string | "0.0.0.0" | Server listening address |
-| `port` | integer | 8080 | HTTP service port |
-| `s3_port` | integer | 8080 | S3 API port |
+| `port` | integer | 3020 | HTTP service port |
+| `s3_port` | integer | 3020 | S3 API port |
 | `enable_tls` | boolean | false | Enable TLS |
 | `tls_cert` | string | "" | TLS certificate path |
 | `tls_key` | string | "" | TLS private key path |

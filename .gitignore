@@ -37,6 +37,10 @@ build/
 *.log
 logs/
 
+# Node (used for screenshot scripts)
+node_modules/
+package-lock.json
+
 # Temporary
 *.tmp
 *.temp

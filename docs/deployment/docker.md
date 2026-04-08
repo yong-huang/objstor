@@ -70,10 +70,10 @@ Paths in the configuration file `data/config/objstor.json` use **container paths
 
 ### Web Interface and API
 
-- **S3 API**: http://localhost:8080
-- **Web UI**: http://localhost:8080/web
-- **Health Check**: http://localhost:8080/health
-- **Metrics**: http://localhost:8080/api/v1/metrics
+- **S3 API**: http://localhost:3020
+- **Web UI**: http://localhost:3020/web
+- **Health Check**: http://localhost:3020/health
+- **Metrics**: http://localhost:3020/api/v1/metrics
 
 ### Default Credentials
 
@@ -125,7 +125,7 @@ tar -czf objstor-backup-$(date +%Y%m%d).tar.gz \
 
 ```bash
 # Configure alias
-alias s3='aws s3 --endpoint-url http://localhost:8080'
+alias s3='aws s3 --endpoint-url http://localhost:3020'
 
 # List buckets
 s3 ls
@@ -155,7 +155,7 @@ rclone config create objstor s3 \
     --provider "Other" \
     --access-key-id "test-access-key" \
     --secret-access-key "test-secret-key" \
-    --endpoint "http://localhost:8080" \
+    --endpoint "http://localhost:3020" \
     --location "us-east-1"
 
 # List buckets
@@ -187,13 +187,13 @@ docker logs --tail 100 objstor
 
 ```bash
 # Using curl
-curl http://localhost:8080/health
+curl http://localhost:3020/health
 
 # Using wget
-wget -qO- http://localhost:8080/health
+wget -qO- http://localhost:3020/health
 
 # View metrics
-curl http://localhost:8080/api/v1/metrics | jq
+curl http://localhost:3020/api/v1/metrics | jq
 ```
 
 ### Performance Monitoring
@@ -232,7 +232,7 @@ chmod -R 755 ./data/
 
 ```bash
 # Check if port is occupied
-lsof -i :8080
+lsof -i :3020
 
 # Check container status
 docker ps -a
@@ -312,7 +312,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "9000:8080"  # Host port:Container port
+  - "9000:3020"  # Host port:Container port
 ```
 
 ### Enable Debug Logging
@@ -393,7 +393,7 @@ docker build -t objstor:latest .
 docker compose up -d
 
 # 5. Verify service
-curl http://localhost:8080/health
+curl http://localhost:3020/health
 ```
 
 ## Uninstall

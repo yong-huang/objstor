@@ -7,9 +7,9 @@
 ### Service Information
 
 - **Running Mode**: Local execution (non-Docker)
-- **S3 API**: http://localhost:8080
-- **Web UI**: http://localhost:8080/web
-- **Health Check**: http://localhost:8080/health
+- **S3 API**: http://localhost:3020
+- **Web UI**: http://localhost:3020/web
+- **Health Check**: http://localhost:3020/health
 - **Storage Directory**: `/Users/hyhit/Desktop/workspace/storage`
 
 ### Storage Configuration
@@ -74,38 +74,38 @@ tail -100 logs/objstor.log
 
 ```bash
 # List all buckets
-aws s3 ls --endpoint-url http://localhost:8080
+aws s3 ls --endpoint-url http://localhost:3020
 
 # Create bucket
-aws s3 mb s3://my-bucket --endpoint-url http://localhost:8080
+aws s3 mb s3://my-bucket --endpoint-url http://localhost:3020
 
 # Upload file
-aws s3 cp file.txt s3://my-bucket/ --endpoint-url http://localhost:8080
+aws s3 cp file.txt s3://my-bucket/ --endpoint-url http://localhost:3020
 
 # Download file
-aws s3 cp s3://my-bucket/file.txt ./downloaded.txt --endpoint-url http://localhost:8080
+aws s3 cp s3://my-bucket/file.txt ./downloaded.txt --endpoint-url http://localhost:3020
 
 # List bucket contents
-aws s3 ls s3://my-bucket/ --endpoint-url http://localhost:8080
+aws s3 ls s3://my-bucket/ --endpoint-url http://localhost:3020
 
 # Delete file
-aws s3 rm s3://my-bucket/file.txt --endpoint-url http://localhost:8080
+aws s3 rm s3://my-bucket/file.txt --endpoint-url http://localhost:3020
 
 # Delete bucket
-aws s3 rb s3://my-bucket --endpoint-url http://localhost:8080
+aws s3 rb s3://my-bucket --endpoint-url http://localhost:3020
 ```
 
 ### Testing and Verification
 
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:3020/health
 
 # List buckets (XML format)
-curl http://localhost:8080/
+curl http://localhost:3020/
 
 # View metrics
-curl http://localhost:8080/api/v1/metrics | jq
+curl http://localhost:3020/api/v1/metrics | jq
 ```
 
 ## Configuration File
@@ -116,7 +116,7 @@ Configuration file location: `data/config/objstor.json`
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
+    "port": 3020,
     "log_level": "info"
   },
   "storage": {
@@ -151,7 +151,7 @@ cat /Users/hyhit/Desktop/workspace/storage/pools/pool-001/objects/*/data
 
 ```bash
 # Check port usage
-lsof -i :8080
+lsof -i :3020
 
 # Stop process occupying the port
 kill -9 <PID>
@@ -174,7 +174,7 @@ cat data/config/objstor.json | jq
 ps aux | grep objstor
 
 # Test port
-telnet localhost 8080
+telnet localhost 3020
 ```
 
 ## Performance Monitoring

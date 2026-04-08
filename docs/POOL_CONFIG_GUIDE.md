@@ -43,8 +43,8 @@ Start service
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 8080,
-    "s3_port": 8080,
+    "port": 3020,
+    "s3_port": 3020,
     "log_level": "info"
   },
   "storage": {
@@ -220,7 +220,7 @@ Startup logs show configuration is correctly loaded:
 [2024-03-22T10:30:00Z INFO]   Pool: pool-002 - Path: "/mnt/storage/pool-002", Capacity: 1 TB, Max Objects: 5000000
 [2024-03-22T10:30:00Z INFO]   Pool: pool-003 - Path: "/mnt/storage/pool-003", Capacity: 1 TB, Max Objects: 5000000
 [2024-03-22T10:30:00Z INFO] Scheduler: least_loaded
-[2024-03-22T10:30:00Z INFO] Server listening on http://0.0.0.0:8080
+[2024-03-22T10:30:00Z INFO] Server listening on http://0.0.0.0:3020
 ```
 
 ## Advantages
