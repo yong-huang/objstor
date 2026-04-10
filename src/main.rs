@@ -214,7 +214,6 @@ async fn main() -> anyhow::Result<()> {
         // WebSocket endpoint
         .route("/ws", axum::routing::get(websocket::websocket_handler))
         // Web UI routes (at /web)
-        .route("/", axum::routing::get(redirect_to_web))
         .route("/web", axum::routing::get(web_handler))
         // Static assets (CSS, JS)
         .nest_service("/static", ServeDir::new("src/web/static"))
@@ -251,12 +250,17 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn s3_handler_wrap(State(state): State<S3AppState>, req: Request) -> Response {
+    // Redirect browsers to /web for non-S3 requests on "/"
+    let path = req.uri().path().to_string();
+    if path == "/" && req.headers().get("authorization").is_none() {
+        return redirect_to_web().await;
+    }
+
     let start = std::time::Instant::now();
     tracing::info!("S3 Request: {} {}", req.method(), req.uri());
 
     let method = req.method().clone();
     let uri = req.uri().clone();
-    let path = uri.path().to_string();
     let headers = req.headers().clone();
 
     // Extract source_ip from headers (fallback to unknown)
