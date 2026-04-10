@@ -8,11 +8,11 @@ class ObjStorApp {
         // Data history for trend charts
         this.history = {
             objectCounts: [],
-            requestTimestamps: [],
             storageUsed: [],
             poolObjects: {},
             bucketStats: [],
         };
+        this.chatMessages = [];
         this.systemMetricsInterval = null;
         this.requestStatsInterval = null;
     }
@@ -291,7 +291,6 @@ class ObjStorApp {
         const now = Date.now();
         this.history.storageUsed.push((data.storage?.used || 0) / (1024 * 1024 * 1024));
         this.history.objectCounts.push(data.total_objects || 0);
-        this.history.requestTimestamps.push(now);
         if (data.pools) {
             data.pools.forEach(p => {
                 if (!this.history.poolObjects[p.id]) this.history.poolObjects[p.id] = [];
@@ -302,7 +301,6 @@ class ObjStorApp {
         const maxLen = 60;
         if (this.history.storageUsed.length > maxLen) this.history.storageUsed.shift();
         if (this.history.objectCounts.length > maxLen) this.history.objectCounts.shift();
-        if (this.history.requestTimestamps.length > maxLen) this.history.requestTimestamps.shift();
         Object.values(this.history.poolObjects).forEach(arr => {
             while (arr.length > maxLen) arr.shift();
         });
@@ -446,8 +444,7 @@ class ObjStorApp {
             chart.update('none');
         }
 
-        // Requests per minute
-        this.updateRequestsChart();
+        // Requests per minute (updated via loadRequestStats)
 
         // Object count trend
         if (this.charts.objectTrend) {
@@ -469,28 +466,6 @@ class ObjStorApp {
             );
             poolChart.update('none');
         }
-    }
-
-    updateRequestsChart() {
-        if (!this.charts.requests) return;
-        const chart = this.charts.requests;
-        const now = Date.now();
-        const oneMinAgo = now - 60000;
-        const recent = this.history.requestTimestamps.filter(t => t > oneMinAgo);
-        // Bucket into 10-second windows
-        const buckets = {};
-        recent.forEach(t => {
-            const slot = Math.floor(t / 10000) * 10;
-            buckets[slot] = (buckets[slot] || 0) + 1;
-        });
-        const labels = Object.keys(buckets).map(k => {
-            const mins = Math.floor((parseInt(k) * 10) / 60);
-            const secs = (parseInt(k) * 10) % 60;
-            return `${mins}m${secs < 10 ? '0' : ''}${secs}s`;
-        });
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = Object.values(buckets);
-        chart.update('none');
     }
 
     updatePoolDonut(metricsData) {
@@ -1233,6 +1208,16 @@ class ObjStorApp {
                 this.charts.methods.data.datasets[0].data = data.methods.map(d => d.count);
                 this.charts.methods.update('none');
             }
+
+            // Update requests per minute chart from server data
+            if (this.charts.requests && data.requests_per_bucket) {
+                this.charts.requests.data.labels = data.requests_per_bucket.map(d => {
+                    const date = new Date(d.bucket_ts * 1000);
+                    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                });
+                this.charts.requests.data.datasets[0].data = data.requests_per_bucket.map(d => d.count);
+                this.charts.requests.update('none');
+            }
         } catch (error) {
             console.error('Failed to load request stats:', error);
         }
@@ -1580,6 +1565,7 @@ class ObjStorApp {
         if (!container) return;
         try {
             const history = JSON.parse(localStorage.getItem('ai_chat_history') || '[]');
+            this.chatMessages = history;
             history.forEach(msg => {
                 const div = document.createElement('div');
                 div.className = `ai-chat-msg ai-chat-${msg.role}`;
@@ -1595,13 +1581,7 @@ class ObjStorApp {
     }
 
     saveChatHistory() {
-        const container = document.getElementById('ai-chat-messages');
-        if (!container) return;
-        const messages = Array.from(container.querySelectorAll('.ai-chat-msg')).map(el => ({
-            role: el.classList.contains('ai-chat-user') ? 'user' : 'system',
-            text: el.textContent,
-        }));
-        localStorage.setItem('ai_chat_history', JSON.stringify(messages));
+        localStorage.setItem('ai_chat_history', JSON.stringify(this.chatMessages));
     }
 
     renderMarkdown(text) {
@@ -1613,6 +1593,7 @@ class ObjStorApp {
     }
 
     clearChatHistory() {
+        this.chatMessages = [];
         localStorage.removeItem('ai_chat_history');
         const container = document.getElementById('ai-chat-messages');
         if (container) container.innerHTML = '';
@@ -1670,6 +1651,7 @@ class ObjStorApp {
         }
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+        this.chatMessages.push({ role, text });
         return div;
     }
 

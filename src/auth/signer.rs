@@ -36,19 +36,17 @@ impl Signer {
         headers: &HashMap<String, String>,
         body: &[u8],
     ) -> Result<String> {
-        // Extract authorization header
         let auth_header = headers
             .get("authorization")
             .ok_or_else(|| Error::MissingHeader("authorization".to_string()))?;
-
-        // Parse AWS signature format
-        // Authorization: AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=...
 
         if !auth_header.starts_with("AWS4-HMAC-SHA256") {
             return Err(Error::SignatureMismatch);
         }
 
-        let parts: Vec<&str> = auth_header.split(", ").collect();
+        // Strip the algorithm prefix so we can parse "Credential=..., SignedHeaders=..., Signature=..."
+        let auth_value = auth_header.strip_prefix("AWS4-HMAC-SHA256 ").unwrap_or("");
+        let parts: Vec<&str> = auth_value.split(", ").collect();
         let mut credential = "";
         let mut signed_headers = "";
         let mut signature = "";
@@ -63,7 +61,6 @@ impl Signer {
             }
         }
 
-        // Parse credential: access_key_id/date/region/service/aws4_request
         let cred_parts: Vec<&str> = credential.split('/').collect();
         if cred_parts.len() != 5 {
             return Err(Error::SignatureMismatch);
@@ -78,11 +75,9 @@ impl Signer {
             return Err(Error::SignatureMismatch);
         }
 
-        // Get secret key
         let access_key = self.metadata_store.get_access_key(access_key_id)?;
         let secret_key = &access_key.secret_key;
 
-        // Calculate expected signature
         let (canonical_uri, canonical_querystring) = match uri.split_once('?') {
             Some((path, query)) => (path, Self::sort_query_string(query)),
             None => (uri, String::new()),
@@ -120,29 +115,28 @@ impl Signer {
         signing_params: &SigningParams,
         canonical_querystring: &str,
     ) -> Result<String> {
-        // 1. Create canonical request
-        let canonical_uri = request_ctx.uri;
         let canonical_headers =
             self.create_canonical_headers(request_ctx.headers, request_ctx.signed_headers)?;
         let signed_headers_list = request_ctx.signed_headers;
 
-        // Use the content hash from headers (may be UNSIGNED-PAYLOAD for streaming)
         let payload_hash = match request_ctx.headers.get("x-amz-content-sha256") {
             Some(hash) => hash.clone(),
             None => hex::encode(sha2::Sha256::digest(request_ctx.body)),
         };
 
+        // AWS SigV4 canonical request format:
+        // HTTPRequestMethod\nCanonicalURI\nCanonicalQueryString\nCanonicalHeaders\nSignedHeaders\nHashedPayload
+        // Note: CanonicalHeaders ends with '\n', so the '\n' before SignedHeaders creates the required blank line
         let canonical_request = format!(
             "{}\n{}\n{}\n{}\n{}\n{}",
             request_ctx.method,
-            canonical_uri,
+            request_ctx.uri,
             canonical_querystring,
             canonical_headers,
             signed_headers_list,
             payload_hash
         );
 
-        // 2. Create string to sign
         let algorithm = "AWS4-HMAC-SHA256";
         let datetime = request_ctx
             .headers
@@ -160,7 +154,6 @@ impl Signer {
             algorithm, datetime, credential_scope, hashed_canonical_request
         );
 
-        // 3. Calculate signature
         let k_date = Self::hmac_sha256(
             format!("AWS4{}", secret_key).as_bytes(),
             signing_params.date.as_bytes(),
@@ -200,7 +193,6 @@ impl Signer {
         Ok(mac.finalize().into_bytes().to_vec())
     }
 
-    /// Sort query string parameters by key name (AWS4 canonical query string).
     fn sort_query_string(query: &str) -> String {
         let mut params: Vec<(&str, &str)> = query
             .split('&')

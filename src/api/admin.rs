@@ -482,6 +482,27 @@ pub async fn get_request_stats(State(state): State<S3AppState>) -> impl IntoResp
         .filter_map(|r| r.ok())
         .collect();
 
+    // Requests per 10-second bucket for the last 5 minutes
+    let mut req_bucket_stmt = conn
+        .prepare(
+            "SELECT (strftime('%s', timestamp) / 10) * 10 as bucket, COUNT(*) as cnt \
+             FROM audit_logs \
+             WHERE timestamp >= datetime('now', '-5 minutes') \
+             GROUP BY bucket ORDER BY bucket",
+        )
+        .unwrap();
+
+    let requests_per_bucket: Vec<serde_json::Value> = req_bucket_stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "bucket_ts": row.get::<_, i64>(0)?,
+                "count": row.get::<_, u64>(1)?,
+            }))
+        })
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
     // Status code distribution (last 1000 logs)
     let mut status_stmt = conn
         .prepare(
@@ -531,6 +552,7 @@ pub async fn get_request_stats(State(state): State<S3AppState>) -> impl IntoResp
         "latency": latency,
         "status_codes": status_codes,
         "methods": methods,
+        "requests_per_bucket": requests_per_bucket,
     }))
 }
 
