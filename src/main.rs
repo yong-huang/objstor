@@ -236,7 +236,18 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Server listening on http://{}", addr);
     tracing::info!("  S3 API: http://{}", addr);
     tracing::info!("  Web UI: http://{}", addr);
-    tracing::info!("Default access key: test-access-key / test-secret-key");
+    // Seed the default access key on first run. Without a row in access_keys,
+    // every SigV4 request fails with 403 SignatureDoesNotMatch — the key was
+    // previously only printed to the log, never stored (fresh clones could
+    // not authenticate until an admin key was created via the API).
+    if state.metadata.get_access_key("test-access-key").is_err() {
+        state
+            .metadata
+            .create_access_key("test-access-key", "test-secret-key", "admin")?;
+        tracing::info!("Seeded default access key: test-access-key / test-secret-key");
+    } else {
+        tracing::info!("Default access key: test-access-key / test-secret-key");
+    }
     tracing::info!("Ready to accept requests!");
 
     // Create TCP listener and start server
