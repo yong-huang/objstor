@@ -467,22 +467,32 @@ pub async fn handle_delete_object_version(
 pub async fn handle_list_objects(
     State(state): State<S3AppState>,
     Path(bucket): Path<String>,
+    axum::extract::RawQuery(raw_query): axum::extract::RawQuery,
 ) -> Result<Response> {
     state.metadata.get_bucket(&bucket)?;
 
-    let objects = state.metadata.list_objects(&bucket, None, 1000)?;
+    // Parse the `prefix` query parameter (clients like kopia/velero rely on
+    // prefix-filtered listing to enumerate objects)
+    let prefix = raw_query.as_deref().and_then(|q| {
+        q.split('&').find_map(|kv| {
+            let (k, v) = kv.split_once('=')?;
+            (k == "prefix").then(|| urldecode(v))
+        })
+    });
+    let objects = state.metadata.list_objects(&bucket, prefix.as_deref(), 1000)?;
 
     // Build XML response
     let mut xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
     <Name>{}</Name>
-    <Prefix></Prefix>
+    <Prefix>{}</Prefix>
     <KeyCount>{}</KeyCount>
     <MaxKeys>1000</MaxKeys>
     <IsTruncated>false</IsTruncated>
 "#,
         bucket,
+        prefix.as_deref().unwrap_or(""),
         objects.len()
     );
 
@@ -828,4 +838,37 @@ Respond ONLY with the JSON object, no explanation, no markdown code fences."#;
 
     tracing::info!("Auto-tagged {}/{} with {} tags", bucket, key, tags.len());
     Ok(())
+}
+
+
+/// Minimal percent-decoder for query parameter values.
+fn urldecode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() + 1 && i + 2 < bytes.len() + 1 => {
+                if let (Some(h), Some(l)) = (
+                    bytes.get(i + 1).and_then(|b| (*b as char).to_digit(16)),
+                    bytes.get(i + 2).and_then(|b| (*b as char).to_digit(16)),
+                ) {
+                    out.push((h * 16 + l) as u8);
+                    i += 3;
+                } else {
+                    out.push(b'%');
+                    i += 1;
+                }
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }

@@ -94,9 +94,13 @@ impl S3Handler {
                         .unwrap_or_else(|e| e.into_response())
                 } else {
                     // Use object handler for listing objects in bucket
-                    object::handle_list_objects(State(state), Path(bucket_name.to_string()))
-                        .await
-                        .unwrap_or_else(|e| e.into_response())
+                    object::handle_list_objects(
+                        State(state),
+                        Path(bucket_name.to_string()),
+                        axum::extract::RawQuery(Some(query.to_string())),
+                    )
+                    .await
+                    .unwrap_or_else(|e| e.into_response())
                 }
             }
             // Batch delete (POST with ?delete)

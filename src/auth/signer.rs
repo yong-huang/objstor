@@ -46,12 +46,16 @@ impl Signer {
 
         // Strip the algorithm prefix so we can parse "Credential=..., SignedHeaders=..., Signature=..."
         let auth_value = auth_header.strip_prefix("AWS4-HMAC-SHA256 ").unwrap_or("");
-        let parts: Vec<&str> = auth_value.split(", ").collect();
+        // SDKs differ in separator style ("a, b" vs "a,b"); split on comma and trim
+        let parts: Vec<String> = auth_value
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .collect();
         let mut credential = "";
         let mut signed_headers = "";
         let mut signature = "";
 
-        for part in parts {
+        for part in &parts {
             if let Some(value) = part.strip_prefix("Credential=") {
                 credential = value;
             } else if let Some(value) = part.strip_prefix("SignedHeaders=") {
@@ -102,6 +106,16 @@ impl Signer {
         )?;
 
         if expected_signature != signature {
+            eprintln!(
+                "[sig-debug] method={} uri={} expected={} actual={} signed_headers={} x-amz-content-sha256={:?} body_len={}",
+                method,
+                uri,
+                expected_signature,
+                signature,
+                signed_headers,
+                headers.get("x-amz-content-sha256"),
+                body.len()
+            );
             return Err(Error::SignatureMismatch);
         }
 

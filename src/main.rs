@@ -355,6 +355,30 @@ async fn s3_handler_wrap(State(state): State<S3AppState>, req: Request) -> Respo
                 .unwrap()
         }
     };
+    // STREAMING-AWS4-HMAC-SHA256-PAYLOAD: the body is aws-chunked framed.
+    // Unwrap it to the real payload (otherwise chunk framing would be stored
+    // as object data). Signature verification still uses the literal header
+    // value, matching the client's canonical request.
+    let body_bytes = if parts
+        .headers
+        .get("x-amz-content-sha256")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.starts_with("STREAMING-AWS4-HMAC-SHA256-PAYLOAD"))
+        .unwrap_or(false)
+    {
+        match decode_aws_chunked(&body_bytes) {
+            Some(decoded) => axum::body::Bytes::from(decoded),
+            None => {
+                return Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(axum::body::Body::from("Malformed chunked payload"))
+                    .unwrap()
+            }
+        }
+    } else {
+        body_bytes
+    };
+    let body_bytes = axum::body::Bytes::from(body_bytes);
 
     // AWS4 signature authentication
     let headers_map: HashMap<String, String> = parts
@@ -575,5 +599,32 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
+    }
+}
+
+
+/// Decode an aws-chunked (STREAMING-AWS4-HMAC-SHA256-PAYLOAD) request body.
+/// Frame format: each chunk is "<hex-size>[;chunk-signature=...]" CRLF <data> CRLF,
+/// terminated by a size=0 chunk.
+fn decode_aws_chunked(input: &[u8]) -> Option<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut rest = input;
+    loop {
+        let header_end = rest.windows(2).position(|w| w == b"\r\n")?;
+        let header = std::str::from_utf8(&rest[..header_end]).ok()?;
+        let size_str = header.split(';').next()?.trim();
+        let size = usize::from_str_radix(size_str, 16).ok()?;
+        rest = &rest[header_end + 2..];
+        if size == 0 {
+            return Some(out); // terminal chunk; trailing trailers (if any) are ignored
+        }
+        if rest.len() < size {
+            return None;
+        }
+        out.extend_from_slice(&rest[..size]);
+        rest = &rest[size..];
+        if rest.starts_with(b"\r\n") {
+            rest = &rest[2..];
+        }
     }
 }

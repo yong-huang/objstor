@@ -164,9 +164,20 @@ impl MetadataStore {
         let mut stmt = conn.prepare(query).map_err(Error::DatabaseError)?;
 
         // Handle both cases separately to avoid type mismatch
-        let objects = if let Some(_prefix) = prefix {
-            // With prefix - not fully implemented, return empty
-            Vec::new()
+        let objects = if let Some(prefix) = prefix {
+            // With prefix - filter keys by prefix (kopia/velero rely on this)
+            stmt.query_map(params![bucket, prefix, limit], |row| {
+                Ok(ObjectMetadata {
+                    key: row.get(0)?,
+                    size: row.get(1)?,
+                    etag: row.get(2)?,
+                    last_modified: DateTime::from_timestamp(row.get(3)?, 0).unwrap(),
+                    storage_class: row.get(4)?,
+                })
+            })
+            .map_err(Error::DatabaseError)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(Error::DatabaseError)?
         } else {
             // Without prefix
             stmt.query_map(params![bucket, limit], |row| {
